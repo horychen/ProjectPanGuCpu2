@@ -1,4 +1,4 @@
-#include "ACMExpr.h"
+#include "All_Definition.h"
 
 //
 // Globals
@@ -9,15 +9,6 @@ struct IPC_MEMORY_READ Read;
 #pragma DATA_SECTION(Write, "SHARERAMGS0"); // GS0 is write
 
 
-void MemCopy(Uint16 *SourceAddr, Uint16* SourceEndAddr, Uint16* DestAddr);
-void MemCopy(Uint16 *SourceAddr, Uint16* SourceEndAddr, Uint16* DestAddr)
-{
-    while(SourceAddr < SourceEndAddr)
-    {
-       *DestAddr++ = *SourceAddr++;
-    }
-    return;
-}
 #define STOP_LED1  GpioDataRegs.GPDCLEAR.bit.GPIO124=1;
 #define STOP_LED2  GpioDataRegs.GPBCLEAR.bit.GPIO33=1;
 #define START_LED1 GpioDataRegs.GPDSET.bit.GPIO124=1;
