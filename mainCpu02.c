@@ -55,7 +55,7 @@ void main(void)
     // InitGpio();  // Skipped for this example
 
     // 初始化SPI，用于与DAC芯片MAX5307通讯。
-    //GpioCtrlRegs.GPBMUX2.bit.GPIO57 = 0; // Configure GPIO57 as C\S\ signal for MAX5307
+    //GpioCtrlRegs.GPDMUX1.bit.GPIO103 = 0; // Configure GPIO57 as C\S\ signal for MAX5307
     InitSpi();
 
     //
@@ -158,10 +158,10 @@ void main(void)
             DAC_MAX5307(2, Read.dac_buffer[1] ); //71us 10khz
             DAC_MAX5307(3, Read.dac_buffer[2] ); //71us 10khz
             DAC_MAX5307(4, Read.dac_buffer[3] ); //71us 10khz
-            //    DAC_MAX5307(5, Read.dac_buffer[4] ); //71us 10khz
-            //    DAC_MAX5307(6, Read.dac_buffer[5] ); //71us 10khz
-            //    DAC_MAX5307(7, Read.dac_buffer[6] ); //71us 10khz
-            //    DAC_MAX5307(8, Read.dac_buffer[7] ); //71us 10khz
+            DAC_MAX5307(5, Read.dac_buffer[4] ); //71us 10khz
+            DAC_MAX5307(6, Read.dac_buffer[5] ); //71us 10khz
+            DAC_MAX5307(7, Read.dac_buffer[6] ); //71us 10khz
+            DAC_MAX5307(8, Read.dac_buffer[7] ); //71us 10khz
 
             IPCRtoLFlagAcknowledge (IPC_FLAG7);
         }
