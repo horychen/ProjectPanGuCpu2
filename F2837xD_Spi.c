@@ -57,11 +57,12 @@ void InitSpi(void)
     // Set reset low before configuration changes
     // Clock polarity (0 == rising, 1 == falling)
     // 16-bit character
-    // Disnable loop-back
+    // Disable loop-back
     SpiaRegs.SPICCR.bit.SPISWRESET = 0;
     SpiaRegs.SPICCR.bit.CLKPOLARITY = 0;
     SpiaRegs.SPICCR.bit.SPICHAR = (16-1);
-    SpiaRegs.SPICCR.bit.SPILBK = 0;
+    //SpiaRegs.SPICCR.bit.SPILBK = 1; // This makes MAX5307 send DAC signal to the oscilloscope??? No, it does not! 231010 cjh, make sure GPIO57 is changed GPIO61
+    SpiaRegs.SPICCR.bit.SPILBK = 0; //
 
     //SpiaRegs.SPICTL.all =0x0006;    // CLOCK PHASE=0, Master Mode, enable talk, and SPI int disabled.
     // Enable master (0 == slave, 1 == master)
@@ -85,15 +86,15 @@ void InitSpi(void)
 
 
     // 唤醒MAX5307
-    GpioDataRegs.GPBSET.bit.GPIO57 = 1;             //cs=1
+    GpioDataRegs.GPBSET.bit.GPIO61 = 1;             //cs=1
     NOP;
     NOP;
-    GpioDataRegs.GPBCLEAR.bit.GPIO57 = 1;           //cs=0
+    GpioDataRegs.GPBCLEAR.bit.GPIO61 = 1;           //cs=0
 
     SpiaRegs.SPITXBUF=0xfffc;                       //MAX5307唤醒字符
     while(SpiaRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
 
-    GpioDataRegs.GPBSET.bit.GPIO57 = 1;             //cs=1为下一次做准备
+    GpioDataRegs.GPBSET.bit.GPIO61 = 1;             //cs=1为下一次做准备
 
     SpiaRegs.SPICCR.bit.SPISWRESET=0;               //通过reset 清楚SPI中断标志INT_FLAG
     NOP;

@@ -19,10 +19,10 @@ void DAC_MAX5307(int channel_number, REAL dac_value)
     // debug
     //b = 2048;
 
-    GpioDataRegs.GPBSET.bit.GPIO57 = 1;//SPICS
+    GpioDataRegs.GPBSET.bit.GPIO61 = 1;//SPICS
     NOP;
     NOP;
-    GpioDataRegs.GPBCLEAR.bit.GPIO57 = 1;
+    GpioDataRegs.GPBCLEAR.bit.GPIO61 = 1;
 
     switch(channel_number)
     {
@@ -68,10 +68,10 @@ void DAC_MAX5307(int channel_number, REAL dac_value)
     NOP;
     SpiaRegs.SPICCR.bit.SPISWRESET = 1;
 
-    GpioDataRegs.GPBSET.bit.GPIO57 = 1;
+    GpioDataRegs.GPBSET.bit.GPIO61 = 1;
     NOP;
     NOP;
-    GpioDataRegs.GPBCLEAR.bit.GPIO57 = 1;
+    GpioDataRegs.GPBCLEAR.bit.GPIO61 = 1;
 
     SpiaRegs.SPITXBUF=0xEFF0;
 
