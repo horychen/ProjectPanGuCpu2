@@ -24,7 +24,9 @@
 // BRR          = (LSPCLK freq / SPI CLK freq) - 1
 //
 #if CPU_FRQ_200MHZ
-#define SPI_BRR        ((200E6 / 4) / 5E6) - 1 // 12.5 MHz
+//#define SPI_BRR        ((200E6 / 4) / 500E3) - 1
+#define SPI_BRR        ((200E6 / 4) / 5E6) - 1 // 12.5 MHz for high speed SPI
+//#define SPI_BRR        ((200E6 / 4) / 5E6) - 1 // 12.5 MHz
 #endif
 
 #if CPU_FRQ_150MHZ
