@@ -1,4 +1,4 @@
-#include "ACMExpr.h"
+#include "All_Definition.h"
 
 //
 // Globals
@@ -9,15 +9,6 @@ struct IPC_MEMORY_READ Read;
 #pragma DATA_SECTION(Write, "SHARERAMGS0"); // GS0 is write
 
 
-void MemCopy(Uint16 *SourceAddr, Uint16* SourceEndAddr, Uint16* DestAddr);
-void MemCopy(Uint16 *SourceAddr, Uint16* SourceEndAddr, Uint16* DestAddr)
-{
-    while(SourceAddr < SourceEndAddr)
-    {
-       *DestAddr++ = *SourceAddr++;
-    }
-    return;
-}
 #define STOP_LED1  GpioDataRegs.GPDCLEAR.bit.GPIO124=1;
 #define STOP_LED2  GpioDataRegs.GPBCLEAR.bit.GPIO33=1;
 #define START_LED1 GpioDataRegs.GPDSET.bit.GPIO124=1;
@@ -55,7 +46,7 @@ void main(void)
     // InitGpio();  // Skipped for this example
 
     // 初始化SPI，用于与DAC芯片MAX5307通讯。
-    //GpioCtrlRegs.GPBMUX2.bit.GPIO57 = 0; // Configure GPIO57 as C\S\ signal for MAX5307
+    //GpioCtrlRegs.GPDMUX1.bit.GPIO103 = 0; // Configure GPIO57 as C\S\ signal for MAX5307
     InitSpi();
 
     //
