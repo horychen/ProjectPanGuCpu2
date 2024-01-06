@@ -19,7 +19,73 @@ void DAC_MAX5307(int channel_number, REAL dac_value)
     // debug
     //b = 2048;
 
-    GpioDataRegs.GPBSET.bit.GPIO61 = 1;//SPICS
+#if 1 // SPI-C
+    GpioDataRegs.GPCSET.bit.GPIO72 = 1;//SPI STE Chip Select
+    NOP;
+    NOP;
+    GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
+
+    switch(channel_number)
+    {
+        case 1 :
+            SpicRegs.SPITXBUF=b|0x2000;                 //DAC_A 通道
+            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
+            break;
+        case 2 :
+            SpicRegs.SPITXBUF=b|0x3000;                 //DAC_B 通道
+            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
+            break;
+        case 3 :
+            SpicRegs.SPITXBUF=b|0x4000;                 //DAC_C 通道
+            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
+            break;
+        case 4 :
+            SpicRegs.SPITXBUF=b|0x5000;                 //DAC_D 通道
+            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
+            break;
+        case 5 :
+            SpicRegs.SPITXBUF=b|0x6000;                 //DAC_E 通道
+            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
+            break;
+        case 6 :
+            SpicRegs.SPITXBUF=b|0x7000;                 //DAC_F 通道
+            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
+            break;
+        case 7 :
+            SpicRegs.SPITXBUF=b|0x8000;                 //DAC_G 通道
+            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
+            break;
+        case 8 :
+            SpicRegs.SPITXBUF=b|0x9000;                 //DAC_H 通道
+            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
+            break;
+        default :
+            NOP;
+            break;
+    }
+
+    SpicRegs.SPICCR.bit.SPISWRESET = 0;
+    NOP;
+    NOP;
+    SpicRegs.SPICCR.bit.SPISWRESET = 1;
+
+    GpioDataRegs.GPCSET.bit.GPIO72 = 1;
+    NOP;
+    NOP;
+    GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
+
+    SpicRegs.SPITXBUF=0xEFF0;
+
+    while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}
+
+    SpicRegs.SPICCR.bit.SPISWRESET=0;
+    NOP;
+    NOP;
+    SpicRegs.SPICCR.bit.SPISWRESET=1;
+
+
+#else
+    GpioDataRegs.GPBSET.bit.GPIO61 = 1;//SPI STE Chip Select
     NOP;
     NOP;
     GpioDataRegs.GPBCLEAR.bit.GPIO61 = 1;
@@ -81,6 +147,6 @@ void DAC_MAX5307(int channel_number, REAL dac_value)
     NOP;
     NOP;
     SpiaRegs.SPICCR.bit.SPISWRESET=1;
-
+#endif
 }
 
