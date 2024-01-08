@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<?ccsproject version="1.0"?>
+<projectOptions>
+	<deviceVariant value="com.ti.ccstudio.deviceModel.C2000.GenericC28xxDevice"/>
+	<deviceFamily value="C2000"/>
+	<codegenToolVersion value="6.3.0.A13150"/>
+	<isElfFormat value="false"/>
+	<connection value="common/targetdb/connections/SEEDXDS560V2USB_Connection.xml"/>
+	<rts value="libc.a"/>
+	<templateProperties value="id=com.ti.common.project.core.emptyProjectTemplate,"/>
+	<isTargetManual value="true"/>
+	<origin value="C:/Users/Henry/OneDrive - Nanyang Technological University/DSP_YuanXin/CCS_Code/Yuming_Workppace_Try/ProjectPanGuCpu2"/>
+</projectOptions>

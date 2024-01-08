@@ -1,0 +1,24 @@
+/.settings
+.launches/*
+
+*.sublime-project
+*.sublime-workspace
+
+doc/
+
+*.d
+*.obj
+*.map
+*.out
+*.xml
+*.mk
+*.ccxml
+*.opt
+# *.ccsproject
+# *.cproject
+# *.project
+*.prefs
+*.launch
+makefile
+/CPU2_FLASH/
+/CPU2_RAM/
