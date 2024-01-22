@@ -1,5 +1,12 @@
 #include "ACMExpr.h"
-
+#include "F2837xD_Cla_typedefs.h"  // F2837xD CLA Type definitions
+#include "F2837xD_device.h"        // F2837xD Headerfile Include File
+#include "F2837xD_Examples.h"      // F2837xD Examples Include File
+#include "hw_can.h"
+#include "hw_ints.h"
+#include "hw_memmap.h"
+#include "hw_types.h"
+#include "can.h"
 //
 // Globals
 //
@@ -24,6 +31,80 @@ void MemCopy(Uint16 *SourceAddr, Uint16* SourceEndAddr, Uint16* DestAddr)
 #define START_LED2 GpioDataRegs.GPBSET.bit.GPIO33=1;
 
 
+
+//*****************************************************************************
+// A counter that keeps track of the number of times the transmit was
+// successful.
+//*****************************************************************************
+volatile unsigned long g_ulMsgCount = 0;
+
+//*****************************************************************************
+// A flag to indicate that some transmission error occurred.
+//*****************************************************************************
+volatile unsigned long g_bErrFlag = 0;
+
+tCANMsgObject sTXCANMessage;
+tCANMsgObject sRXCANMessage;
+unsigned char ucTXMsgData[8], ucRXMsgData[8];
+double angle_can = 0;
+unsigned long long angle_can1 = 0;
+unsigned long long angle_can2 = 0;
+unsigned long long angle_can3 = 0;
+
+
+// Prototype statements for functions found within this file.
+void scia_echoback_init(void);
+void scia_fifo_init(void);
+void scia_xmit(int a);
+unsigned char SciReceivedChar[6];
+unsigned char check;
+unsigned char precheck;
+long long pos;
+double angle_sci;
+
+int startRecode = 1;
+long dataIndex=0;
+double anglePre=0;
+double angleNow=0;
+
+Uint16 TestCount=0;
+Uint16 TestCount2=0;
+
+void get_sci_angle(){
+
+    SciaRegs.SCIFFRX.bit.RXFIFORESET = 0;
+    DELAY_US(10);
+    SciaRegs.SCIFFRX.bit.RXFIFORESET = 1;
+
+    GpioDataRegs.GPASET.bit.GPIO8 = 1;
+//    DELAY_US(2);
+    scia_xmit(2);
+    TestCount++;
+    DELAY_US(5);
+//        DELAY_US(4);
+    GpioDataRegs.GPACLEAR.bit.GPIO8 = 1;
+
+    int retryTime;
+    for(retryTime=0; retryTime<10;retryTime++)
+    {
+        DELAY_US(400);
+        if(SciaRegs.SCIFFRX.bit.RXFFST >= 6)
+        {
+            int i;
+            for(i=0;i<6;i++)
+            {
+                SciReceivedChar[i]=SciaRegs.SCIRXBUF.all & 0x00FF;  // Read data
+            }
+            pos = (long long)(SciReceivedChar[4] *65536) + (long long)(SciReceivedChar[3] *256) + (long long)(SciReceivedChar[2]);
+            //angle_sci = pos * 360 *(double)7.6293945e-6 /64;
+            angle_sci = pos * (double)7.6293945e-6 * 0.015625 * 360.0;
+            TestCount2++;
+            break;
+        }
+    }
+}
+
+
 //
 // Main
 //
@@ -46,7 +127,6 @@ void main(void)
     //
     InitSysCtrl();
 
-
     //
     // Step 2. Initialize GPIO:
     // This example function is found in the F2837xD_Gpio.c file and
@@ -57,6 +137,29 @@ void main(void)
     // 初始化SPI，用于与DAC芯片MAX5307通讯。
     //GpioCtrlRegs.GPBMUX2.bit.GPIO57 = 0; // Configure GPIO57 as C\S\ signal for MAX5307
     InitSpi();
+
+
+
+    // Initialize the CAN controller
+    CANInit(CANA_BASE);
+
+    // Setup CAN to be clocked
+    CANClkSourceSelect(CANA_BASE, 0);
+
+    // Set up the bit rate for the CAN bus.  This function sets up the CAN
+    // bus timing for a nominal configuration.  You can achieve more control
+    // over the CAN bus timing by using the function CANBitTimingSet() instead
+    // of this one, if needed.
+    // In this example, the CAN bus is set to 500 kHz.  In the function below,
+    // the call to SysCtlClockGet() is used to determine the clock rate that
+    // is used for clocking the CAN peripheral.  This can be replaced with a
+    // fixed value if you know the value of the system clock, saving the extra
+    // function call.  For some parts, the CAN peripheral is clocked by a fixed
+    // 8 MHz regardless of the system clock in which case the call to
+    // SysCtlClockGet() should be replaced with 8000000.  Consult the data
+    // sheet for more information about CAN peripheral clocking.
+    CANBitRateSet(CANA_BASE, 200000000, 500000);
+
 
     //
     // Step 3. Clear all interrupts and initialize PIE vector table:
@@ -150,6 +253,45 @@ void main(void)
 
     START_LED2
 
+
+
+    scia_fifo_init();      // Initialize the SCI FIFO
+    scia_echoback_init();  // Initialize SCI for echoback
+    // Enable test mode and select external loopback
+//    HWREG(CANA_BASE + CAN_O_CTL) |= CAN_CTL_TEST;
+//    HWREG(CANA_BASE + CAN_O_TEST) = CAN_TEST_EXL;
+
+    // Enable the CAN for operation.
+    CANEnable(CANA_BASE);
+
+    // Initialize the message object that will be used for sending CAN
+    // messages.  The message will be 4 bytes that will contain an incrementing
+    // value.  Initially it will be set to 0.
+    *(unsigned long *)ucTXMsgData = 0;
+    sTXCANMessage.ui32MsgID = 1;                        // CAN message ID - use 1
+    sTXCANMessage.ui32MsgIDMask = 0;                    // no mask needed for TX
+    sTXCANMessage.ui32Flags = MSG_OBJ_TX_INT_ENABLE;    // enable interrupt on TX
+    sTXCANMessage.ui32MsgLen = sizeof(ucTXMsgData);     // size of message is 4
+    sTXCANMessage.pucMsgData = ucTXMsgData;           // ptr to message content
+
+    // Initialize the message object that will be used for recieving CAN
+    // messages.
+    *(unsigned long *)ucRXMsgData = 0;
+    sRXCANMessage.ui32MsgID = 1;                        // CAN message ID - use 1
+    sRXCANMessage.ui32MsgIDMask = 0;                    // no mask needed for TX
+    sRXCANMessage.ui32Flags = MSG_OBJ_NO_FLAGS;         //
+    sRXCANMessage.ui32MsgLen = sizeof(ucRXMsgData);     // size of message is 4
+    sRXCANMessage.pucMsgData = ucRXMsgData;           // ptr to message content
+
+    // Enter loop to send messages.  A new message will be sent once per
+    // second.  The 4 bytes of message content will be treated as an unsigned
+    // long and incremented by one each time.
+
+    // Setup the message object being used to receive messages
+    CANMessageSet(CANA_BASE, 2, &sRXCANMessage, MSG_OBJ_TYPE_RX);
+
+
+
     while(1)
     {
         if(IPCRtoLFlagBusy(IPC_FLAG7) == 1){
@@ -174,8 +316,98 @@ void main(void)
             // Set a flag to notify CPU02 that data is available
             IPCLtoRFlagSet(IPC_FLAG10);
         }
+
+        get_sci_angle();
+
+        CANMessageGet(CANA_BASE, 2, &sRXCANMessage, true);
+        angle_can = (ucRXMsgData[5]*65536+ ucRXMsgData[4]* 256+ ucRXMsgData[3]) * 360 * (double)7.6293945e-6;
+
+//        if(dataStoreCan[dataIndex]==0){
+//            dataStoreCan[dataIndex] = angle_can;
+//        }
+//        if(startRecode == 1){
+//
+//            if( angle_can - dataStoreCan[dataIndex] > 0.05){
+//                dataIndex--;
+//            }else if( angle_can - dataStoreCan[dataIndex] < -0.05){
+//                dataIndex++;
+//            }
+//
+//            if(dataIndex>=3600){
+//                dataIndex = 3599;
+//            }else if (dataIndex<0){
+//                dataIndex = 0;
+//            }
+//
+//            dataStoreCan[dataIndex] = angle_can;
+//            dataStoreSci[dataIndex] = angle_sci;
+//        }
+
     }
 }
+
+
+void scia_echoback_init()
+{
+    // Note: Clocks were turned on to the SCIA peripheral
+    // in the InitSysCtrl() function
+
+    SciaRegs.SCICCR.all =0x0007;   // 1 stop bit,  No loopback
+                                   // No parity,8 char bits,
+                                   // async mode, idle-line protocol
+
+//    SciaRegs.SCICCR.bit.PARITYENA =1;
+    SciaRegs.SCICTL1.all =0x0003;  // enable TX, RX, internal SCICLK,
+                                   // Disable RX ERR, SLEEP, TXWAKE
+    SciaRegs.SCICTL2.all =0x0003;
+    SciaRegs.SCICTL2.bit.TXINTENA =1;
+    SciaRegs.SCICTL2.bit.RXBKINTENA =1;
+
+//    SciaRegs.SCIHBAUD.all    =0x0002;  // 9600 baud @LSPCLK = 50MHz (200 MHz SYSCLK).
+//    SciaRegs.SCILBAUD.all    =0x008B;
+//    SciaRegs.SCIHBAUD.all    =0x0001;  // 14400 baud @LSPCLK = 50MHz (200 MHz SYSCLK).
+//    SciaRegs.SCILBAUD.all    =0x00B1;
+//    SciaRegs.SCIHBAUD.all    =0x0003;  // 14400 baud @LSPCLK = 100MHz (200 MHz SYSCLK).
+//    SciaRegs.SCILBAUD.all    =0x0063;
+//    SciaRegs.SCIHBAUD.all =0x0000; //LSPCLK=100M
+//    SciaRegs.SCILBAUD.all =0x0018; //CLK=0.5M
+
+    SciaRegs.SCIHBAUD.all =0x0000; //LSPCLK=100M
+    SciaRegs.SCILBAUD.all =0x0004; //CLK=2.5M
+
+    SciaRegs.SCICTL1.all =0x0023;  // Relinquish SCI from Reset
+}
+
+// Transmit a character from the SCI
+void scia_xmit(int a)
+{
+    while (SciaRegs.SCIFFTX.bit.TXFFST != 0) {}
+    SciaRegs.SCITXBUF.all =a;
+
+}
+
+void scia_msg(char * msg)
+{
+    int i;
+    i = 0;
+    while(msg[i] != '\0')
+    {
+        scia_xmit(msg[i]);
+        i++;
+    }
+}
+
+// Initialize the SCI FIFO
+void scia_fifo_init()
+{
+    SciaRegs.SCIFFTX.all=0xE040;
+    SciaRegs.SCIFFRX.all=0x2044;
+    SciaRegs.SCIFFCT.all=0x0;
+
+}
+
+
+
 
 //
 // cpu_timer0_isr - CPU Timer0 ISR

@@ -17,6 +17,7 @@
 // Define Global Peripheral Variables:
 //
 //----------------------------------------
+
 #ifdef __cplusplus
 #pragma DATA_SECTION("AdcaRegsFile")
 #else
