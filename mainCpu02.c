@@ -70,19 +70,28 @@ double angleNow=0;
 Uint16 TestCount=0;
 Uint16 TestCount2=0;
 
+// 注意，Eureka扩展板和测试板使用的WE信号管脚不同
+#define EUREKA_BOARD
+
+#ifdef EUREKA_BOARD
+#define 485ENCODER_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO137 = 1;
+#define 485ENCODER_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO137 = 1;
+#else
+#define 485ENCODER_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO8 = 1;
+#define 485ENCODER_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO8 = 1;
+#endif
+
 void get_sci_angle(){
 
     SciaRegs.SCIFFRX.bit.RXFIFORESET = 0;
     DELAY_US(10);
     SciaRegs.SCIFFRX.bit.RXFIFORESET = 1;
 
-    GpioDataRegs.GPASET.bit.GPIO8 = 1;
-//    DELAY_US(2);
+    485ENCODER_WRITE_ENABLE
     scia_xmit(2);
     TestCount++;
     DELAY_US(5);
-//        DELAY_US(4);
-    GpioDataRegs.GPACLEAR.bit.GPIO8 = 1;
+    485ENCODER_WRITE_DISABLE
 
     int retryTime;
     for(retryTime=0; retryTime<10;retryTime++)
