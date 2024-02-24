@@ -7,6 +7,8 @@
 #include "hw_memmap.h"
 #include "hw_types.h"
 #include "can.h"
+
+
 //
 // Globals
 //
@@ -43,42 +45,40 @@ volatile unsigned long g_ulMsgCount = 0;
 //*****************************************************************************
 volatile unsigned long g_bErrFlag = 0;
 
-tCANMsgObject sTXCANMessage;
-tCANMsgObject sRXCANMessage;
-unsigned char ucTXMsgData[8], ucRXMsgData[8];
-double angle_can = 0;
-unsigned long long angle_can1 = 0;
-unsigned long long angle_can2 = 0;
-unsigned long long angle_can3 = 0;
+tCANMsgObject sTXCANMessage_ID0x01;
+tCANMsgObject sRXCANMessage_ID0x01;
+unsigned char ucTXMsgData_ID0x01[8], ucRXMsgData_ID0x01[8];
+tCANMsgObject sTXCANMessage_ID0x03;
+tCANMsgObject sRXCANMessage_ID0x03;
+unsigned char ucTXMsgData_ID0x03[8], ucRXMsgData_ID0x03[8];
 
+#define TX_ID0x01_OBJID 1
+#define RX_ID0x01_OBJID 2
+#define TX_ID0x03_OBJID 3
+#define RX_ID0x03_OBJID 4
 
 // Prototype statements for functions found within this file.
 void scia_echoback_init(void);
 void scia_fifo_init(void);
 void scia_xmit(int a);
 unsigned char SciReceivedChar[6];
-unsigned char check;
-unsigned char precheck;
-long long pos;
-double angle_sci;
+Uint32 sci_pos;
+Uint32 can_pos_ID0x01;
+Uint32 can_pos_ID0x03;
 
-int startRecode = 1;
-long dataIndex=0;
-double anglePre=0;
-double angleNow=0;
 
 Uint16 TestCount=0;
 Uint16 TestCount2=0;
 
-// ◊¢“‚£¨Eureka¿©’π∞Â∫Õ≤‚ ‘∞Â π”√µƒWE–≈∫≈π‹Ω≈≤ªÕ¨
+// Ê≥®ÊÑèÔºåEurekaÊâ©Â±ïÊùøÂíåÊµãËØïÊùø‰ΩøÁî®ÁöÑWE‰ø°Âè∑ÁÆ°ËÑö‰∏çÂêå
 #define EUREKA_BOARD
 
 #ifdef EUREKA_BOARD
-#define 485ENCODER_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO137 = 1;
-#define 485ENCODER_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO137 = 1;
+#define ENCODER485_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO137 = 1;
+#define ENCODER485_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO137 = 1;
 #else
-#define 485ENCODER_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO8 = 1;
-#define 485ENCODER_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO8 = 1;
+#define ENCODER485_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO8 = 1;
+#define ENCODER485_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO8 = 1;
 #endif
 
 void get_sci_angle(){
@@ -87,11 +87,11 @@ void get_sci_angle(){
     DELAY_US(10);
     SciaRegs.SCIFFRX.bit.RXFIFORESET = 1;
 
-    485ENCODER_WRITE_ENABLE
+    ENCODER485_WRITE_ENABLE
     scia_xmit(2);
     TestCount++;
     DELAY_US(5);
-    485ENCODER_WRITE_DISABLE
+    ENCODER485_WRITE_DISABLE
 
     int retryTime;
     for(retryTime=0; retryTime<10;retryTime++)
@@ -104,15 +104,13 @@ void get_sci_angle(){
             {
                 SciReceivedChar[i]=SciaRegs.SCIRXBUF.all & 0x00FF;  // Read data
             }
-            pos = (long long)(SciReceivedChar[4] *65536) + (long long)(SciReceivedChar[3] *256) + (long long)(SciReceivedChar[2]);
+            sci_pos = (Uint32)(SciReceivedChar[4] *65536) + (Uint32)(SciReceivedChar[3] *256) + (Uint32)(SciReceivedChar[2]);
             //angle_sci = pos * 360 *(double)7.6293945e-6 /64;
-            angle_sci = pos * (double)7.6293945e-6 * 0.015625 * 360.0;
             TestCount2++;
             break;
         }
     }
 }
-
 
 //
 // Main
@@ -143,7 +141,7 @@ void main(void)
     //
     // InitGpio();  // Skipped for this example
 
-    // ≥ı ºªØSPI£¨”√”⁄”ÎDAC–æ∆¨MAX5307Õ®—∂°£
+    // ÂàùÂßãÂåñSPIÔºåÁî®‰∫é‰∏éDACËäØÁâáMAX5307ÈÄöËÆØ„ÄÇ
     //GpioCtrlRegs.GPBMUX2.bit.GPIO57 = 0; // Configure GPIO57 as C\S\ signal for MAX5307
     InitSpi();
 
@@ -151,9 +149,11 @@ void main(void)
 
     // Initialize the CAN controller
     CANInit(CANA_BASE);
+    CANInit(CANB_BASE);
 
     // Setup CAN to be clocked
     CANClkSourceSelect(CANA_BASE, 0);
+    CANClkSourceSelect(CANB_BASE, 0);
 
     // Set up the bit rate for the CAN bus.  This function sets up the CAN
     // bus timing for a nominal configuration.  You can achieve more control
@@ -168,6 +168,7 @@ void main(void)
     // SysCtlClockGet() should be replaced with 8000000.  Consult the data
     // sheet for more information about CAN peripheral clocking.
     CANBitRateSet(CANA_BASE, 200000000, 500000);
+    CANBitRateSet(CANB_BASE, 200000000, 500000);
 
 
     //
@@ -272,32 +273,55 @@ void main(void)
 
     // Enable the CAN for operation.
     CANEnable(CANA_BASE);
+    CANEnable(CANB_BASE);
 
     // Initialize the message object that will be used for sending CAN
-    // messages.  The message will be 4 bytes that will contain an incrementing
-    // value.  Initially it will be set to 0.
-    *(unsigned long *)ucTXMsgData = 0;
-    sTXCANMessage.ui32MsgID = 1;                        // CAN message ID - use 1
-    sTXCANMessage.ui32MsgIDMask = 0;                    // no mask needed for TX
-    sTXCANMessage.ui32Flags = MSG_OBJ_TX_INT_ENABLE;    // enable interrupt on TX
-    sTXCANMessage.ui32MsgLen = sizeof(ucTXMsgData);     // size of message is 4
-    sTXCANMessage.pucMsgData = ucTXMsgData;           // ptr to message content
+    // messages.
+    sTXCANMessage_ID0x01.ui32MsgID = 1;                        // CAN message ID - use 1
+    sTXCANMessage_ID0x01.ui32MsgIDMask = 0;                    // no mask needed for TX
+    sTXCANMessage_ID0x01.ui32Flags = MSG_OBJ_TX_INT_ENABLE;    // enable interrupt on TX
+    sTXCANMessage_ID0x01.ui32MsgLen = 3;     // size of message is
+    ucTXMsgData_ID0x01[0] = sTXCANMessage_ID0x01.ui32MsgLen;
+    ucTXMsgData_ID0x01[1] = sTXCANMessage_ID0x01.ui32MsgID;
+    ucTXMsgData_ID0x01[2] = 1;
+    sTXCANMessage_ID0x01.pucMsgData = ucTXMsgData_ID0x01;           // ptr to message content
 
     // Initialize the message object that will be used for recieving CAN
     // messages.
-    *(unsigned long *)ucRXMsgData = 0;
-    sRXCANMessage.ui32MsgID = 1;                        // CAN message ID - use 1
-    sRXCANMessage.ui32MsgIDMask = 0;                    // no mask needed for TX
-    sRXCANMessage.ui32Flags = MSG_OBJ_NO_FLAGS;         //
-    sRXCANMessage.ui32MsgLen = sizeof(ucRXMsgData);     // size of message is 4
-    sRXCANMessage.pucMsgData = ucRXMsgData;           // ptr to message content
+    *(unsigned long *)ucRXMsgData_ID0x01 = 0;
+    sRXCANMessage_ID0x01.ui32MsgID = 1;                        // CAN message ID - use 1
+    sRXCANMessage_ID0x01.ui32MsgIDMask = 0;                    // no mask needed for TX
+    sRXCANMessage_ID0x01.ui32Flags = MSG_OBJ_NO_FLAGS;         //
+    sRXCANMessage_ID0x01.ui32MsgLen = sizeof(ucRXMsgData_ID0x01);     // size of message is 4
+    sRXCANMessage_ID0x01.pucMsgData = ucRXMsgData_ID0x01;           // ptr to message content
+
+    // Initialize the message object that will be used for sending CAN
+    // messages.
+    sTXCANMessage_ID0x03.ui32MsgID = 3;                        // CAN message ID - use 3
+    sTXCANMessage_ID0x03.ui32MsgIDMask = 0;                    // no mask needed for TX
+    sTXCANMessage_ID0x03.ui32Flags = MSG_OBJ_TX_INT_ENABLE;    // enable interrupt on TX
+    sTXCANMessage_ID0x03.ui32MsgLen = 0x03;     // size of message is
+    ucTXMsgData_ID0x03[0] = sTXCANMessage_ID0x03.ui32MsgLen;
+    ucTXMsgData_ID0x03[1] = sTXCANMessage_ID0x03.ui32MsgID;
+    ucTXMsgData_ID0x03[2] = 0x01;
+    sTXCANMessage_ID0x03.pucMsgData = ucTXMsgData_ID0x03;           // ptr to message content
+
+    // Initialize the message object that will be used for recieving CAN
+    // messages.
+    *(unsigned long *)ucRXMsgData_ID0x03 = 0;
+    sRXCANMessage_ID0x03.ui32MsgID = 3;                        // CAN message ID - use 3
+    sRXCANMessage_ID0x03.ui32MsgIDMask = 0;                    // no mask needed for TX
+    sRXCANMessage_ID0x03.ui32Flags = MSG_OBJ_NO_FLAGS;         //
+    sRXCANMessage_ID0x03.ui32MsgLen = sizeof(ucRXMsgData_ID0x03);     // size of message is 4
+    sRXCANMessage_ID0x03.pucMsgData = ucRXMsgData_ID0x03;           // ptr to message content
 
     // Enter loop to send messages.  A new message will be sent once per
     // second.  The 4 bytes of message content will be treated as an unsigned
     // long and incremented by one each time.
 
     // Setup the message object being used to receive messages
-    CANMessageSet(CANA_BASE, 2, &sRXCANMessage, MSG_OBJ_TYPE_RX);
+    CANMessageSet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, MSG_OBJ_TYPE_RX);
+    CANMessageSet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, MSG_OBJ_TYPE_RX);
 
 
 
@@ -322,14 +346,23 @@ void main(void)
             Write.position_cmd_elec += 0.01;
             Write.speed_cmd_elec -= 0.01;
 
+            Write.SCI_position_elec = sci_pos;
+            Write.CAN_position_elec_ID0x01 = can_pos_ID0x01;
+            Write.CAN_position_elec_ID0x03 = can_pos_ID0x03;
             // Set a flag to notify CPU02 that data is available
             IPCLtoRFlagSet(IPC_FLAG10);
         }
 
         get_sci_angle();
+        CANMessageSet(CANA_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
+        DELAY_US(5000);
+        CANMessageGet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
+        can_pos_ID0x01 = (Uint32)(ucRXMsgData_ID0x01[5]*65536)+ (Uint32)(ucRXMsgData_ID0x01[4] * 256) + (Uint32)(ucRXMsgData_ID0x01[3]);
 
-        CANMessageGet(CANA_BASE, 2, &sRXCANMessage, true);
-        angle_can = (ucRXMsgData[5]*65536+ ucRXMsgData[4]* 256+ ucRXMsgData[3]) * 360 * (double)7.6293945e-6;
+        CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
+        DELAY_US(5000);
+        CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
+        can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
 
 //        if(dataStoreCan[dataIndex]==0){
 //            dataStoreCan[dataIndex] = angle_can;

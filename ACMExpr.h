@@ -20,19 +20,27 @@ struct IPC_MEMORY_READ{
 };
 struct IPC_MEMORY_WRITE{
     /* read/write (RW) shared memory @ GS0  owned by CPU2 */
+    Uint32 SCI_position_elec;
+    Uint32 CAN_position_elec_ID0x01;
+    Uint32 CAN_position_elec_ID0x03;
+
     REAL position_cmd_elec;
     REAL speed_cmd_elec;
 
+    int16 SCI_char;
     // Ë«Ïò±äÁ¿
 };
 
 extern struct IPC_MEMORY_WRITE Write;
 extern struct IPC_MEMORY_READ Read;
 
+
 //extern uint16_t isrfuncLoadStart;
 //extern uint16_t isrfuncLoadEnd;
 //extern uint16_t isrfuncRunStart;
 //extern uint16_t isrfuncLoadSize;
+
+
 
 
 //
