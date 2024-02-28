@@ -66,10 +66,16 @@ unsigned char SciReceivedChar[6];
 Uint32 sci_pos;
 Uint32 can_pos_ID0x01;
 Uint32 can_pos_ID0x03; // knee joint encoder
+Uint32 can_pos_prev;
 
+REAL dataStoreCan[2000];
+REAL dataStoreSci[2000];
 
+int32 deltaPos;
+int16 dataWidth = 10;
+Uint16 startRecode = 0;
+int16 dataIndex = 0;
 Uint16 TestCount=0;
-Uint16 TestCount2=0;
 
 // 注意，Eureka扩展板和测试板使用的WE信号管脚不同
 #define EUREKA_BOARD
@@ -329,6 +335,12 @@ void main(void)
     CANMessageSet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, MSG_OBJ_TYPE_RX);
     CANMessageSet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, MSG_OBJ_TYPE_RX);
 
+    int i;
+    for(i=0;i<2000;i++)
+    {
+        dataStoreCan[i] = 0;
+        dataStoreSci[i] = 0;
+    }
 
 
     while(1)
@@ -372,23 +384,36 @@ void main(void)
 
         DELAY_US(1000);
 
+
+//        deltaPos = (int32)(can_pos_ID0x03 - can_pos_prev);
+//        if(deltaPos < -65536)
+//        {
+//            deltaPos += 131072;
 //        }
-//        if(startRecode == 1){
+//        if(deltaPos > 65536)
+//        {
+//            deltaPos -= 131072;
+//        }
+//        if( deltaPos < (-1)*dataWidth){
+//            dataIndex--;
+//            startRecode = 1;
+//        }else if( deltaPos > dataWidth){
+//            dataIndex++;
+//            startRecode = 1;
+//        }
 //
-//            if( angle_can - dataStoreCan[dataIndex] > 0.05){
-//                dataIndex--;
-//            }else if( angle_can - dataStoreCan[dataIndex] < -0.05){
-//                dataIndex++;
-//            }
+//        if(dataIndex>=2000){
+//            dataIndex = 1999;
+//        }else if (dataIndex<0){
+//            dataIndex = 0;
+//        }
 //
-//            if(dataIndex>=3600){
-//                dataIndex = 3599;
-//            }else if (dataIndex<0){
-//                dataIndex = 0;
-//            }
-//
-//            dataStoreCan[dataIndex] = angle_can;
-//            dataStoreSci[dataIndex] = angle_sci;
+//        if(startRecode == 1)
+//        {
+//            can_pos_prev = can_pos_ID0x03;
+//            dataStoreCan[dataIndex] = (REAL)(can_pos_ID0x03/131072.0*360.0);
+//            dataStoreSci[dataIndex] = (REAL)(sci_pos/8388608.0*360.0);
+//            startRecode = 0;
 //        }
 
     }
