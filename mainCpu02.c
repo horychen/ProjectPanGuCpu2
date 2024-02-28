@@ -58,13 +58,14 @@ unsigned char ucTXMsgData_ID0x03[8], ucRXMsgData_ID0x03[8];
 #define RX_ID0x03_OBJID 4
 
 // Prototype statements for functions found within this file.
+interrupt void sciaRxFifoIsr(void);
 void scia_echoback_init(void);
 void scia_fifo_init(void);
 void scia_xmit(int a);
 unsigned char SciReceivedChar[6];
 Uint32 sci_pos;
 Uint32 can_pos_ID0x01;
-Uint32 can_pos_ID0x03;
+Uint32 can_pos_ID0x03; // knee joint encoder
 
 
 Uint16 TestCount=0;
@@ -87,29 +88,30 @@ void get_sci_angle(){
     DELAY_US(10);
     SciaRegs.SCIFFRX.bit.RXFIFORESET = 1;
 
+    // 半双工模式
     ENCODER485_WRITE_ENABLE
     scia_xmit(2);
     TestCount++;
     DELAY_US(5);
     ENCODER485_WRITE_DISABLE
 
-    int retryTime;
-    for(retryTime=0; retryTime<10;retryTime++)
-    {
-        DELAY_US(400);
-        if(SciaRegs.SCIFFRX.bit.RXFFST >= 6)
-        {
-            int i;
-            for(i=0;i<6;i++)
-            {
-                SciReceivedChar[i]=SciaRegs.SCIRXBUF.all & 0x00FF;  // Read data
-            }
-            sci_pos = (Uint32)(SciReceivedChar[4] *65536) + (Uint32)(SciReceivedChar[3] *256) + (Uint32)(SciReceivedChar[2]);
-            //angle_sci = pos * 360 *(double)7.6293945e-6 /64;
-            TestCount2++;
-            break;
-        }
-    }
+//    int retryTime;
+//    for(retryTime=0; retryTime<10;retryTime++)
+//    {
+//        DELAY_US(400);
+//        if(SciaRegs.SCIFFRX.bit.RXFFST >= 6)
+//        {
+//            int i;
+//            for(i=0;i<6;i++)
+//            {
+//                SciReceivedChar[i]=SciaRegs.SCIRXBUF.all & 0x00FF;  // Read data
+//            }
+//            sci_pos = (Uint32)(SciReceivedChar[4] *65536) + (Uint32)(SciReceivedChar[3] *256) + (Uint32)(SciReceivedChar[2]);
+//            //angle_sci = pos * 360 *(double)7.6293945e-6 /64;
+//            TestCount2++;
+//            break;
+//        }
+//    }
 }
 
 //
@@ -217,6 +219,7 @@ void main(void)
     //
     EALLOW;  // This is needed to write to EALLOW protected registers
     //PieVectTable.TIMER0_INT = &cpu_timer0_isr;
+    PieVectTable.SCIA_RX_INT = &sciaRxFifoIsr;
     EDIS;    // This is needed to disable write to EALLOW protected registers
 
     //
@@ -251,6 +254,9 @@ void main(void)
     //
     //PieCtrlRegs.PIEIER1.bit.INTx7 = 1;
 
+    PieCtrlRegs.PIECTRL.bit.ENPIE = 1;   // Enable the PIE block
+    PieCtrlRegs.PIEIER9.bit.INTx1 = 1;   // PIE Group 9, INT1 SCIA receive
+    IER = 0x100;                         // Enable CPU INT
     //
     // Enable global Interrupts and higher priority real-time debug events:
     //
@@ -355,17 +361,17 @@ void main(void)
 
         get_sci_angle();
         CANMessageSet(CANA_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
-        DELAY_US(5000);
+        DELAY_US(5);
         CANMessageGet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
         can_pos_ID0x01 = (Uint32)(ucRXMsgData_ID0x01[5]*65536)+ (Uint32)(ucRXMsgData_ID0x01[4] * 256) + (Uint32)(ucRXMsgData_ID0x01[3]);
 
         CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
-        DELAY_US(5000);
+        DELAY_US(5);
         CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
         can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
 
-//        if(dataStoreCan[dataIndex]==0){
-//            dataStoreCan[dataIndex] = angle_can;
+        DELAY_US(1000);
+
 //        }
 //        if(startRecode == 1){
 //
@@ -442,13 +448,33 @@ void scia_msg(char * msg)
 // Initialize the SCI FIFO
 void scia_fifo_init()
 {
-    SciaRegs.SCIFFTX.all=0xE040;
-    SciaRegs.SCIFFRX.all=0x2044;
+    SciaRegs.SCIFFTX.all=0xC040;
+    SciaRegs.SCIFFRX.all=0x2026;
     SciaRegs.SCIFFCT.all=0x0;
 
+    SciaRegs.SCIFFTX.bit.TXFIFORESET = 1;
+    SciaRegs.SCIFFRX.bit.RXFIFORESET = 1;
 }
 
+//
+// sciaRxFifoIsr - SCIA Receive FIFO ISR
+//
+interrupt void sciaRxFifoIsr(void)
+{
+    Uint16 i;
 
+    for(i=0;i<6;i++)
+    {
+       SciReceivedChar[i]=SciaRegs.SCIRXBUF.all & 0x00FF;  // Read data
+    }
+    sci_pos = (Uint32)(SciReceivedChar[4] *65536) + (Uint32)(SciReceivedChar[3] *256) + (Uint32)(SciReceivedChar[2]);
+
+
+    SciaRegs.SCIFFRX.bit.RXFFOVRCLR=1;   // Clear Overflow flag
+    SciaRegs.SCIFFRX.bit.RXFFINTCLR=1;   // Clear Interrupt flag
+
+    PieCtrlRegs.PIEACK.all|=0x100;       // Issue PIE ack
+}
 
 
 //
