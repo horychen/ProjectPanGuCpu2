@@ -351,10 +351,10 @@ void main(void)
             DAC_MAX5307(2, Read.dac_buffer[1] ); //71us 10khz
             DAC_MAX5307(3, Read.dac_buffer[2] ); //71us 10khz
             DAC_MAX5307(4, Read.dac_buffer[3] ); //71us 10khz
-            DAC_MAX5307(5, Read.dac_buffer[4] ); //71us 10khz
-            DAC_MAX5307(6, Read.dac_buffer[5] ); //71us 10khz
-            DAC_MAX5307(7, Read.dac_buffer[6] ); //71us 10khz
-            DAC_MAX5307(8, Read.dac_buffer[7] ); //71us 10khz
+            //            DAC_MAX5307(5, Read.dac_buffer[4] ); //71us 10khz
+            //            DAC_MAX5307(6, Read.dac_buffer[5] ); //71us 10khz
+            //            DAC_MAX5307(7, Read.dac_buffer[6] ); //71us 10khz
+            //            DAC_MAX5307(8, Read.dac_buffer[7] ); //71us 10khz
 
             IPCRtoLFlagAcknowledge (IPC_FLAG7);
         }
@@ -382,7 +382,7 @@ void main(void)
         CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
         can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
 
-        DELAY_US(1000);
+        DELAY_US(900);
 
 
         //        deltaPos = (int32)(can_pos_ID0x03 - can_pos_prev);
