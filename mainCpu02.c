@@ -385,36 +385,36 @@ void main(void)
         DELAY_US(1000);
 
 
-//        deltaPos = (int32)(can_pos_ID0x03 - can_pos_prev);
-//        if(deltaPos < -65536)
-//        {
-//            deltaPos += 131072;
-//        }
-//        if(deltaPos > 65536)
-//        {
-//            deltaPos -= 131072;
-//        }
-//        if( deltaPos < (-1)*dataWidth){
-//            dataIndex--;
-//            startRecode = 1;
-//        }else if( deltaPos > dataWidth){
-//            dataIndex++;
-//            startRecode = 1;
-//        }
-//
-//        if(dataIndex>=2000){
-//            dataIndex = 1999;
-//        }else if (dataIndex<0){
-//            dataIndex = 0;
-//        }
-//
-//        if(startRecode == 1)
-//        {
-//            can_pos_prev = can_pos_ID0x03;
-//            dataStoreCan[dataIndex] = (REAL)(can_pos_ID0x03/131072.0*360.0);
-//            dataStoreSci[dataIndex] = (REAL)(sci_pos/8388608.0*360.0);
-//            startRecode = 0;
-//        }
+        //        deltaPos = (int32)(can_pos_ID0x03 - can_pos_prev);
+        //        if(deltaPos < -65536)
+        //        {
+        //            deltaPos += 131072;
+        //        }
+        //        if(deltaPos > 65536)
+        //        {
+        //            deltaPos -= 131072;
+        //        }
+        //        if( deltaPos < (-1)*dataWidth){
+        //            dataIndex++;
+        //            startRecode = 1;
+        //        }else if( deltaPos > dataWidth){
+        //            dataIndex--;
+        //            startRecode = 1;
+        //        }
+        //
+        //        if(dataIndex>=2000){
+        //            dataIndex = 1999;
+        //        }else if (dataIndex<0){
+        //            dataIndex = 0;
+        //        }
+        //
+        //        if(startRecode == 1)
+        //        {
+        //            can_pos_prev = can_pos_ID0x03;
+        //            dataStoreCan[dataIndex] = (REAL)(can_pos_ID0x03/131072.0*360.0);
+        //            dataStoreSci[dataIndex] = (REAL)(sci_pos/8388608.0*360.0);
+        //            startRecode = 0;
+        //        }
 
     }
 }
