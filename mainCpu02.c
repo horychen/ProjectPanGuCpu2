@@ -62,8 +62,14 @@ interrupt void sciaRxFifoIsr(void);
 void scia_echoback_init(void);
 void scia_fifo_init(void);
 void scia_xmit(int a);
-unsigned char SciReceivedChar[6];
-Uint32 sci_pos;
+interrupt void scibRxFifoIsr(void);
+void scib_echoback_init(void);
+void scib_fifo_init(void);
+void scib_xmit(int a);
+unsigned char SciAReceivedChar[6];
+unsigned char SciBReceivedChar[6];
+Uint32 sciA_pos;
+Uint32 sciB_pos;
 Uint32 can_pos_ID0x01;
 Uint32 can_pos_ID0x03; // knee joint encoder
 Uint32 can_pos_prev;
@@ -75,49 +81,51 @@ int32 deltaPos;
 int16 dataWidth = 10;
 Uint16 startRecode = 0;
 int16 dataIndex = 0;
-Uint16 TestCount=0;
+
+int sciaTxCount = 0;
+int sciaRxCount = 0;
+int scibTxCount = 0;
+int scibRxCount = 0;
 
 // 注意，Eureka扩展板和测试板使用的WE信号管脚不同
 #define EUREKA_BOARD
 
 #ifdef EUREKA_BOARD
-#define ENCODER485_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO137 = 1;
-#define ENCODER485_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO137 = 1;
+#define ENCODER485_KNEE_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO139 = 1;
+#define ENCODER485_KNEE_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO139 = 1;
+#define ENCODER485_HIP_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO140 = 1;
+#define ENCODER485_HIP_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO140 = 1;
 #else
-#define ENCODER485_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO8 = 1;
-#define ENCODER485_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO8 = 1;
+#define ENCODER485_KNEE_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO8 = 1;
+#define ENCODER485_KNEE_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO8 = 1;
 #endif
 
-void get_sci_angle(){
+void get_sciA_angle(){
 
     SciaRegs.SCIFFRX.bit.RXFIFORESET = 0;
     DELAY_US(10);
     SciaRegs.SCIFFRX.bit.RXFIFORESET = 1;
 
     // 半双工模式
-    ENCODER485_WRITE_ENABLE
+    ENCODER485_KNEE_WRITE_ENABLE
     scia_xmit(2);
-    TestCount++;
+    sciaTxCount++;
     DELAY_US(5);
-    ENCODER485_WRITE_DISABLE
+    ENCODER485_KNEE_WRITE_DISABLE
+}
 
-//    int retryTime;
-//    for(retryTime=0; retryTime<10;retryTime++)
-//    {
-//        DELAY_US(400);
-//        if(SciaRegs.SCIFFRX.bit.RXFFST >= 6)
-//        {
-//            int i;
-//            for(i=0;i<6;i++)
-//            {
-//                SciReceivedChar[i]=SciaRegs.SCIRXBUF.all & 0x00FF;  // Read data
-//            }
-//            sci_pos = (Uint32)(SciReceivedChar[4] *65536) + (Uint32)(SciReceivedChar[3] *256) + (Uint32)(SciReceivedChar[2]);
-//            //angle_sci = pos * 360 *(double)7.6293945e-6 /64;
-//            TestCount2++;
-//            break;
-//        }
-//    }
+void get_sciB_angle(){
+
+    ScibRegs.SCIFFRX.bit.RXFIFORESET = 0;
+    DELAY_US(10);
+    ScibRegs.SCIFFRX.bit.RXFIFORESET = 1;
+
+    // 半双工模式
+    ENCODER485_HIP_WRITE_ENABLE
+    scib_xmit(2);
+    scibTxCount++;
+    DELAY_US(5);
+    ENCODER485_HIP_WRITE_DISABLE
 }
 
 //
@@ -226,6 +234,7 @@ void main(void)
     EALLOW;  // This is needed to write to EALLOW protected registers
     //PieVectTable.TIMER0_INT = &cpu_timer0_isr;
     PieVectTable.SCIA_RX_INT = &sciaRxFifoIsr;
+    PieVectTable.SCIB_RX_INT = &scibRxFifoIsr;
     EDIS;    // This is needed to disable write to EALLOW protected registers
 
     //
@@ -262,6 +271,7 @@ void main(void)
 
     PieCtrlRegs.PIECTRL.bit.ENPIE = 1;   // Enable the PIE block
     PieCtrlRegs.PIEIER9.bit.INTx1 = 1;   // PIE Group 9, INT1 SCIA receive
+    PieCtrlRegs.PIEIER9.bit.INTx3 = 1;   // PIE Group 9, INT1 SCIB receive
     IER = 0x100;                         // Enable CPU INT
     //
     // Enable global Interrupts and higher priority real-time debug events:
@@ -279,6 +289,8 @@ void main(void)
 
     scia_fifo_init();      // Initialize the SCI FIFO
     scia_echoback_init();  // Initialize SCI for echoback
+    scib_fifo_init();      // Initialize the SCI FIFO
+    scib_echoback_init();  // Initialize SCI for echoback
     // Enable test mode and select external loopback
 //    HWREG(CANA_BASE + CAN_O_CTL) |= CAN_CTL_TEST;
 //    HWREG(CANA_BASE + CAN_O_TEST) = CAN_TEST_EXL;
@@ -364,25 +376,27 @@ void main(void)
             Write.position_cmd_elec += 0.01;
             Write.speed_cmd_elec -= 0.01;
 
-            Write.SCI_position_elec = sci_pos;
+            Write.SCI_knee_position_elec = sciA_pos;
+            Write.SCI_hip_position_elec  = sciB_pos;
             Write.CAN_position_elec_ID0x01 = can_pos_ID0x01;
             Write.CAN_position_elec_ID0x03 = can_pos_ID0x03;
             // Set a flag to notify CPU02 that data is available
             IPCLtoRFlagSet(IPC_FLAG10);
         }
 
-        get_sci_angle();
+        get_sciA_angle();
         CANMessageSet(CANA_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
         DELAY_US(5);
         CANMessageGet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
         can_pos_ID0x01 = (Uint32)(ucRXMsgData_ID0x01[5]*65536)+ (Uint32)(ucRXMsgData_ID0x01[4] * 256) + (Uint32)(ucRXMsgData_ID0x01[3]);
+        DELAY_US(450);
 
+        get_sciB_angle();
         CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
         DELAY_US(5);
         CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
         can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
-
-        DELAY_US(900);
+        DELAY_US(450);
 
 
         //        deltaPos = (int32)(can_pos_ID0x03 - can_pos_prev);
@@ -450,7 +464,36 @@ void scia_echoback_init()
 
     SciaRegs.SCICTL1.all =0x0023;  // Relinquish SCI from Reset
 }
+void scib_echoback_init()
+{
+    // Note: Clocks were turned on to the SCIB peripheral
+    // in the InitSysCtrl() function
 
+    ScibRegs.SCICCR.all =0x0007;   // 1 stop bit,  No loopback
+                                   // No parity,8 char bits,
+                                   // async mode, idle-line protocol
+
+//    SciaRegs.SCICCR.bit.PARITYENA =1;
+    ScibRegs.SCICTL1.all =0x0003;  // enable TX, RX, internal SCICLK,
+                                   // Disable RX ERR, SLEEP, TXWAKE
+    ScibRegs.SCICTL2.all =0x0003;
+    ScibRegs.SCICTL2.bit.TXINTENA =1;
+    ScibRegs.SCICTL2.bit.RXBKINTENA =1;
+
+//    SciaRegs.SCIHBAUD.all    =0x0002;  // 9600 baud @LSPCLK = 50MHz (200 MHz SYSCLK).
+//    SciaRegs.SCILBAUD.all    =0x008B;
+//    SciaRegs.SCIHBAUD.all    =0x0001;  // 14400 baud @LSPCLK = 50MHz (200 MHz SYSCLK).
+//    SciaRegs.SCILBAUD.all    =0x00B1;
+//    SciaRegs.SCIHBAUD.all    =0x0003;  // 14400 baud @LSPCLK = 100MHz (200 MHz SYSCLK).
+//    SciaRegs.SCILBAUD.all    =0x0063;
+//    SciaRegs.SCIHBAUD.all =0x0000; //LSPCLK=100M
+//    SciaRegs.SCILBAUD.all =0x0018; //CLK=0.5M
+
+    ScibRegs.SCIHBAUD.all =0x0000; //LSPCLK=100M
+    ScibRegs.SCILBAUD.all =0x0004; //CLK=2.5M
+
+    ScibRegs.SCICTL1.all =0x0023;  // Relinquish SCI from Reset
+}
 // Transmit a character from the SCI
 void scia_xmit(int a)
 {
@@ -458,7 +501,13 @@ void scia_xmit(int a)
     SciaRegs.SCITXBUF.all =a;
 
 }
+// Transmit a character from the SCI
+void scib_xmit(int a)
+{
+    while (ScibRegs.SCIFFTX.bit.TXFFST != 0) {}
+    ScibRegs.SCITXBUF.all =a;
 
+}
 void scia_msg(char * msg)
 {
     int i;
@@ -469,7 +518,16 @@ void scia_msg(char * msg)
         i++;
     }
 }
-
+void scib_msg(char * msg)
+{
+    int i;
+    i = 0;
+    while(msg[i] != '\0')
+    {
+        scib_xmit(msg[i]);
+        i++;
+    }
+}
 // Initialize the SCI FIFO
 void scia_fifo_init()
 {
@@ -480,7 +538,16 @@ void scia_fifo_init()
     SciaRegs.SCIFFTX.bit.TXFIFORESET = 1;
     SciaRegs.SCIFFRX.bit.RXFIFORESET = 1;
 }
+// Initialize the SCI FIFO
+void scib_fifo_init()
+{
+    ScibRegs.SCIFFTX.all=0xC040;
+    ScibRegs.SCIFFRX.all=0x2026;
+    ScibRegs.SCIFFCT.all=0x0;
 
+    ScibRegs.SCIFFTX.bit.TXFIFORESET = 1;
+    ScibRegs.SCIFFRX.bit.RXFIFORESET = 1;
+}
 //
 // sciaRxFifoIsr - SCIA Receive FIFO ISR
 //
@@ -490,17 +557,37 @@ interrupt void sciaRxFifoIsr(void)
 
     for(i=0;i<6;i++)
     {
-       SciReceivedChar[i]=SciaRegs.SCIRXBUF.all & 0x00FF;  // Read data
+       SciAReceivedChar[i]=SciaRegs.SCIRXBUF.all & 0x00FF;  // Read data
     }
-    sci_pos = (Uint32)(SciReceivedChar[4] *65536) + (Uint32)(SciReceivedChar[3] *256) + (Uint32)(SciReceivedChar[2]);
+    sciA_pos = (Uint32)(SciAReceivedChar[4] *65536) + (Uint32)(SciAReceivedChar[3] *256) + (Uint32)(SciAReceivedChar[2]);
 
+    sciaRxCount++;
 
     SciaRegs.SCIFFRX.bit.RXFFOVRCLR=1;   // Clear Overflow flag
     SciaRegs.SCIFFRX.bit.RXFFINTCLR=1;   // Clear Interrupt flag
 
     PieCtrlRegs.PIEACK.all|=0x100;       // Issue PIE ack
 }
+//
+// scibRxFifoIsr - SCIB Receive FIFO ISR
+//
+interrupt void scibRxFifoIsr(void)
+{
+    Uint16 i;
 
+    for(i=0;i<6;i++)
+    {
+       SciBReceivedChar[i]=ScibRegs.SCIRXBUF.all & 0x00FF;  // Read data
+    }
+    sciB_pos = (Uint32)(SciBReceivedChar[4] *65536) + (Uint32)(SciBReceivedChar[3] *256) + (Uint32)(SciBReceivedChar[2]);
+
+    scibRxCount++;
+
+    ScibRegs.SCIFFRX.bit.RXFFOVRCLR=1;   // Clear Overflow flag
+    ScibRegs.SCIFFRX.bit.RXFFINTCLR=1;   // Clear Interrupt flag
+
+    PieCtrlRegs.PIEACK.all|=0x100;       // Issue PIE ack
+}
 
 //
 // cpu_timer0_isr - CPU Timer0 ISR
