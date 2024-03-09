@@ -74,6 +74,9 @@ Uint32 can_pos_ID0x01;
 Uint32 can_pos_ID0x03; // knee joint encoder
 Uint32 can_pos_prev;
 
+Uint32 can_used;
+Uint32 sci_used;
+
 REAL dataStoreCan[2000];
 REAL dataStoreSci[2000];
 
@@ -103,7 +106,7 @@ int scibRxCount = 0;
 void get_sciA_angle(){
 
     SciaRegs.SCIFFRX.bit.RXFIFORESET = 0;
-    DELAY_US(10);
+    DELAY_US(2);
     SciaRegs.SCIFFRX.bit.RXFIFORESET = 1;
 
     // 半双工模式
@@ -117,7 +120,7 @@ void get_sciA_angle(){
 void get_sciB_angle(){
 
     ScibRegs.SCIFFRX.bit.RXFIFORESET = 0;
-    DELAY_US(10);
+    DELAY_US(2);
     ScibRegs.SCIFFRX.bit.RXFIFORESET = 1;
 
     // 半双工模式
@@ -384,51 +387,56 @@ void main(void)
             IPCLtoRFlagSet(IPC_FLAG10);
         }
 
-        get_sciA_angle();
         CANMessageSet(CANA_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
         DELAY_US(5);
         CANMessageGet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
         can_pos_ID0x01 = (Uint32)(ucRXMsgData_ID0x01[5]*65536)+ (Uint32)(ucRXMsgData_ID0x01[4] * 256) + (Uint32)(ucRXMsgData_ID0x01[3]);
-        DELAY_US(450);
+        DELAY_US(30);
 
-        get_sciB_angle();
         CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
         DELAY_US(5);
         CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
         can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
-        DELAY_US(450);
 
-
-        //        deltaPos = (int32)(can_pos_ID0x03 - can_pos_prev);
-        //        if(deltaPos < -65536)
-        //        {
-        //            deltaPos += 131072;
-        //        }
-        //        if(deltaPos > 65536)
-        //        {
-        //            deltaPos -= 131072;
-        //        }
-        //        if( deltaPos < (-1)*dataWidth){
-        //            dataIndex++;
-        //            startRecode = 1;
-        //        }else if( deltaPos > dataWidth){
-        //            dataIndex--;
-        //            startRecode = 1;
-        //        }
-        //
-        //        if(dataIndex>=2000){
-        //            dataIndex = 1999;
-        //        }else if (dataIndex<0){
-        //            dataIndex = 0;
-        //        }
-        //
-        //        if(startRecode == 1)
-        //        {
-        //            can_pos_prev = can_pos_ID0x03;
-        //            dataStoreCan[dataIndex] = (REAL)(can_pos_ID0x03/131072.0*360.0);
-        //            dataStoreSci[dataIndex] = (REAL)(sci_pos/8388608.0*360.0);
-        //            startRecode = 0;
-        //        }
+        get_sciA_angle();
+        get_sciB_angle();
+                // hip
+//                can_used = can_pos_ID0x01;
+//                sci_used = sciB_pos;
+        //        // knee
+//                can_used = can_pos_ID0x03;
+//                sci_used = sciA_pos;
+//
+//                deltaPos = (int32)(can_used - can_pos_prev);
+//                if(deltaPos < -65536)
+//                {
+//                    deltaPos += 131072;
+//                }
+//                if(deltaPos > 65536)
+//                {
+//                    deltaPos -= 131072;
+//                }
+//                if( deltaPos < (-1)*dataWidth){
+//                    dataIndex++;
+//                    startRecode = 1;
+//                }else if( deltaPos > dataWidth){
+//                    dataIndex--;
+//                    startRecode = 1;
+//                }
+//
+//                if(dataIndex>=2000){
+//                    dataIndex = 1999;
+//                }else if (dataIndex<0){
+//                    dataIndex = 0;
+//                }
+//
+//                if(startRecode == 1)
+//                {
+//                    can_pos_prev = can_used;
+//                    dataStoreCan[dataIndex] = (REAL)(can_used/131072.0*360.0);
+//                    dataStoreSci[dataIndex] = (REAL)(sci_used/8388608.0*360.0);
+//                    startRecode = 0;
+//                }
 
     }
 }
