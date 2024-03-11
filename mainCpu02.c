@@ -379,10 +379,10 @@ void main(void)
             Write.position_cmd_elec += 0.01;
             Write.speed_cmd_elec -= 0.01;
 
-            Write.SCI_knee_position_elec = sciA_pos;
-            Write.SCI_hip_position_elec  = sciB_pos;
-            Write.CAN_position_elec_ID0x01 = can_pos_ID0x01;
-            Write.CAN_position_elec_ID0x03 = can_pos_ID0x03;
+            Write.SCI_knee_position_count = sciA_pos;
+            Write.SCI_hip_position_count  = sciB_pos;
+            Write.CAN_position_count_ID0x01 = can_pos_ID0x01;
+            Write.CAN_position_count_ID0x03 = can_pos_ID0x03;
             // Set a flag to notify CPU02 that data is available
             IPCLtoRFlagSet(IPC_FLAG10);
         }

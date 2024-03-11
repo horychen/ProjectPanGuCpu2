@@ -20,11 +20,11 @@ struct IPC_MEMORY_READ{
 };
 struct IPC_MEMORY_WRITE{
     /* read/write (RW) shared memory @ GS0  owned by CPU2 */
-    Uint32 SCI_knee_position_elec;
-    Uint32 CAN_position_elec_ID0x03;
+    Uint32 SCI_knee_position_count;
+    Uint32 CAN_position_count_ID0x03;
 
-    Uint32 SCI_hip_position_elec;
-    Uint32 CAN_position_elec_ID0x01;
+    Uint32 SCI_hip_position_count;
+    Uint32 CAN_position_count_ID0x01;
 
     REAL position_cmd_elec;
     REAL speed_cmd_elec;
