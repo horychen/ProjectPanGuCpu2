@@ -397,6 +397,7 @@ void main(void)
         DELAY_US(5);
         CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
         can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
+        DELAY_US(30);
 
         get_sciA_angle();
         get_sciB_angle();
