@@ -131,6 +131,9 @@ void get_sciB_angle(){
     ENCODER485_HIP_WRITE_DISABLE
 }
 
+
+Uint64 mainWhileLoopCounter = 0;
+
 //
 // Main
 //
@@ -360,6 +363,7 @@ void main(void)
 
     while(1)
     {
+        mainWhileLoopCounter++;
         if(IPCRtoLFlagBusy(IPC_FLAG7) == 1){
 
             DAC_MAX5307(1, Read.dac_buffer[0] ); //71us 10khz
@@ -387,17 +391,18 @@ void main(void)
             IPCLtoRFlagSet(IPC_FLAG10);
         }
 
+        DELAY_US(2);
         CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
-        DELAY_US(5);
+        DELAY_US(20);
         CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
         can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
-        DELAY_US(20);
+        DELAY_US(2);
 
         CANMessageSet(CANA_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
-        DELAY_US(3);
+        DELAY_US(20);
         CANMessageGet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
         can_pos_ID0x01 = (Uint32)(ucRXMsgData_ID0x01[5]*65536)+ (Uint32)(ucRXMsgData_ID0x01[4] * 256) + (Uint32)(ucRXMsgData_ID0x01[3]);
-        DELAY_US(20);
+        DELAY_US(2);
 
         get_sciA_angle();
         DELAY_US(2);
