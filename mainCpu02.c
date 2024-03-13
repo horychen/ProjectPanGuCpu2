@@ -71,7 +71,7 @@ unsigned char SciBReceivedChar[6];
 Uint32 sciA_pos;
 Uint32 sciB_pos;
 Uint32 can_pos_ID0x01;
-Uint32 can_pos_ID0x03; // knee joint encoder
+Uint32 can_pos_ID0x03; // shank joint encoder
 Uint32 can_pos_prev;
 
 Uint32 can_used;
@@ -94,13 +94,13 @@ int scibRxCount = 0;
 #define EUREKA_BOARD
 
 #ifdef EUREKA_BOARD
-#define ENCODER485_KNEE_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO139 = 1;
-#define ENCODER485_KNEE_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO139 = 1;
+#define ENCODER485_shank_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO139 = 1;
+#define ENCODER485_shank_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO139 = 1;
 #define ENCODER485_HIP_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO140 = 1;
 #define ENCODER485_HIP_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO140 = 1;
 #else
-#define ENCODER485_KNEE_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO8 = 1;
-#define ENCODER485_KNEE_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO8 = 1;
+#define ENCODER485_shank_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO8 = 1;
+#define ENCODER485_shank_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO8 = 1;
 #endif
 
 void get_sciA_angle(){
@@ -110,11 +110,11 @@ void get_sciA_angle(){
     SciaRegs.SCIFFRX.bit.RXFIFORESET = 1;
 
     // 半双工模式
-    ENCODER485_KNEE_WRITE_ENABLE
+    ENCODER485_shank_WRITE_ENABLE
     scia_xmit(2);
     sciaTxCount++;
     DELAY_US(5);
-    ENCODER485_KNEE_WRITE_DISABLE
+    ENCODER485_shank_WRITE_DISABLE
 }
 
 void get_sciB_angle(){
@@ -379,7 +379,7 @@ void main(void)
             Write.position_cmd_elec += 0.01;
             Write.speed_cmd_elec -= 0.01;
 
-            Write.SCI_knee_position_count = sciA_pos;
+            Write.SCI_shank_position_count = sciA_pos;
             Write.SCI_hip_position_count  = sciB_pos;
             Write.CAN_position_count_ID0x01 = can_pos_ID0x01;
             Write.CAN_position_count_ID0x03 = can_pos_ID0x03;
@@ -387,24 +387,26 @@ void main(void)
             IPCLtoRFlagSet(IPC_FLAG10);
         }
 
-        CANMessageSet(CANA_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
-        DELAY_US(5);
-        CANMessageGet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
-        can_pos_ID0x01 = (Uint32)(ucRXMsgData_ID0x01[5]*65536)+ (Uint32)(ucRXMsgData_ID0x01[4] * 256) + (Uint32)(ucRXMsgData_ID0x01[3]);
-        DELAY_US(30);
-
         CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
         DELAY_US(5);
         CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
         can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
-        DELAY_US(30);
+        DELAY_US(20);
+
+        CANMessageSet(CANA_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
+        DELAY_US(3);
+        CANMessageGet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
+        can_pos_ID0x01 = (Uint32)(ucRXMsgData_ID0x01[5]*65536)+ (Uint32)(ucRXMsgData_ID0x01[4] * 256) + (Uint32)(ucRXMsgData_ID0x01[3]);
+        DELAY_US(20);
 
         get_sciA_angle();
+        DELAY_US(2);
         get_sciB_angle();
+        DELAY_US(2);
                 // hip
 //                can_used = can_pos_ID0x01;
 //                sci_used = sciB_pos;
-        //        // knee
+        //        // shank
 //                can_used = can_pos_ID0x03;
 //                sci_used = sciA_pos;
 //
