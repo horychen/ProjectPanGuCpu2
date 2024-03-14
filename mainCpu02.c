@@ -389,26 +389,36 @@ void main(void)
             IPCLtoRFlagSet(IPC_FLAG10);
         }
 
+
+
         CANMessageSet(CANA_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
+
+        //        DELAY_US(2);
+        get_sciA_angle();
         DELAY_US(can01TxDelay);
+
         CANMessageGet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
         can_pos_ID0x01 = (Uint32)(ucRXMsgData_ID0x01[5]*65536)+ (Uint32)(ucRXMsgData_ID0x01[4] * 256) + (Uint32)(ucRXMsgData_ID0x01[3]);
         DELAY_US(can01RxDelay);
 
-        DELAY_US(can01RxDelay);
+
+
+
+
 
         CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
+
+        get_sciB_angle();
+        //        DELAY_US(2);
         DELAY_US(can03TxDelay);
+
         CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
         can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
-        DELAY_US(can03RxDelay);
+//        DELAY_US(can03RxDelay);
 
 
 
-        get_sciA_angle();
-        DELAY_US(2);
-        get_sciB_angle();
-        DELAY_US(2);
+
                 // hip
 //                can_used = can_pos_ID0x01;
 //                sci_used = sciB_pos;
