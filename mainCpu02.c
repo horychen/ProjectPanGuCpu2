@@ -85,10 +85,10 @@ int16 dataWidth = 10;
 Uint16 startRecode = 0;
 int16 dataIndex = 0;
 
-int sciaTxCount = 0;
-int sciaRxCount = 0;
-int scibTxCount = 0;
-int scibRxCount = 0;
+int can01TxDelay = 15;
+int can01RxDelay = 15;
+int can03TxDelay = 15;
+int can03RxDelay = 15;
 
 // 注意，Eureka扩展板和测试板使用的WE信号管脚不同
 #define EUREKA_BOARD
@@ -112,7 +112,6 @@ void get_sciA_angle(){
     // 半双工模式
     ENCODER485_shank_WRITE_ENABLE
     scia_xmit(2);
-    sciaTxCount++;
     DELAY_US(5);
     ENCODER485_shank_WRITE_DISABLE
 }
@@ -126,7 +125,6 @@ void get_sciB_angle(){
     // 半双工模式
     ENCODER485_HIP_WRITE_ENABLE
     scib_xmit(2);
-    scibTxCount++;
     DELAY_US(5);
     ENCODER485_HIP_WRITE_DISABLE
 }
@@ -330,10 +328,10 @@ void main(void)
     sTXCANMessage_ID0x03.ui32MsgID = 3;                        // CAN message ID - use 3
     sTXCANMessage_ID0x03.ui32MsgIDMask = 0;                    // no mask needed for TX
     sTXCANMessage_ID0x03.ui32Flags = MSG_OBJ_TX_INT_ENABLE;    // enable interrupt on TX
-    sTXCANMessage_ID0x03.ui32MsgLen = 0x03;     // size of message is
+    sTXCANMessage_ID0x03.ui32MsgLen = 3;     // size of message is
     ucTXMsgData_ID0x03[0] = sTXCANMessage_ID0x03.ui32MsgLen;
     ucTXMsgData_ID0x03[1] = sTXCANMessage_ID0x03.ui32MsgID;
-    ucTXMsgData_ID0x03[2] = 0x01;
+    ucTXMsgData_ID0x03[2] = 1;
     sTXCANMessage_ID0x03.pucMsgData = ucTXMsgData_ID0x03;           // ptr to message content
 
     // Initialize the message object that will be used for recieving CAN
@@ -391,18 +389,21 @@ void main(void)
             IPCLtoRFlagSet(IPC_FLAG10);
         }
 
-        DELAY_US(2);
-        CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
-        DELAY_US(20);
-        CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
-        can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
-        DELAY_US(2);
-
         CANMessageSet(CANA_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
-        DELAY_US(20);
+        DELAY_US(can01TxDelay);
         CANMessageGet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
         can_pos_ID0x01 = (Uint32)(ucRXMsgData_ID0x01[5]*65536)+ (Uint32)(ucRXMsgData_ID0x01[4] * 256) + (Uint32)(ucRXMsgData_ID0x01[3]);
-        DELAY_US(2);
+        DELAY_US(can01RxDelay);
+
+        DELAY_US(can01RxDelay);
+
+        CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
+        DELAY_US(can03TxDelay);
+        CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
+        can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
+        DELAY_US(can03RxDelay);
+
+
 
         get_sciA_angle();
         DELAY_US(2);
@@ -577,7 +578,6 @@ interrupt void sciaRxFifoIsr(void)
     }
     sciA_pos = (Uint32)(SciAReceivedChar[4] *65536) + (Uint32)(SciAReceivedChar[3] *256) + (Uint32)(SciAReceivedChar[2]);
 
-    sciaRxCount++;
 
     SciaRegs.SCIFFRX.bit.RXFFOVRCLR=1;   // Clear Overflow flag
     SciaRegs.SCIFFRX.bit.RXFFINTCLR=1;   // Clear Interrupt flag
@@ -596,8 +596,6 @@ interrupt void scibRxFifoIsr(void)
        SciBReceivedChar[i]=ScibRegs.SCIRXBUF.all & 0x00FF;  // Read data
     }
     sciB_pos = (Uint32)(SciBReceivedChar[4] *65536) + (Uint32)(SciBReceivedChar[3] *256) + (Uint32)(SciBReceivedChar[2]);
-
-    scibRxCount++;
 
     ScibRegs.SCIFFRX.bit.RXFFOVRCLR=1;   // Clear Overflow flag
     ScibRegs.SCIFFRX.bit.RXFFINTCLR=1;   // Clear Interrupt flag
