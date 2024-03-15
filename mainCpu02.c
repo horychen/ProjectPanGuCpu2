@@ -77,8 +77,8 @@ Uint32 can_pos_prev;
 Uint32 can_used;
 Uint32 sci_used;
 
-REAL dataStoreCan[2000];
-REAL dataStoreSci[2000];
+//REAL dataStoreCan[2000];
+//REAL dataStoreSci[2000];
 
 int32 deltaPos;
 int16 dataWidth = 10;
@@ -88,7 +88,12 @@ int16 dataIndex = 0;
 int can01TxDelay = 15;
 int can01RxDelay = 15;
 int can03TxDelay = 15;
-int can03RxDelay = 15;
+int can03RxDelay = 20;
+
+Uint32 sciATxCount = 0;
+Uint32 sciARxCount = 0;
+Uint32 sciBTxCount = 0;
+Uint32 sciBRxCount = 0;
 
 // 注意，Eureka扩展板和测试板使用的WE信号管脚不同
 #define EUREKA_BOARD
@@ -113,6 +118,7 @@ void get_sciA_angle(){
     ENCODER485_shank_WRITE_ENABLE
     scia_xmit(2);
     DELAY_US(5);
+    sciATxCount++;
     ENCODER485_shank_WRITE_DISABLE
 }
 
@@ -126,6 +132,7 @@ void get_sciB_angle(){
     ENCODER485_HIP_WRITE_ENABLE
     scib_xmit(2);
     DELAY_US(5);
+    sciBTxCount++;
     ENCODER485_HIP_WRITE_DISABLE
 }
 
@@ -351,13 +358,14 @@ void main(void)
     CANMessageSet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, MSG_OBJ_TYPE_RX);
     CANMessageSet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, MSG_OBJ_TYPE_RX);
 
-    int i;
-    for(i=0;i<2000;i++)
-    {
+    #if FALSE
+        int i;
+        for(i=0;i<2000;i++)
+        {
         dataStoreCan[i] = 0;
         dataStoreSci[i] = 0;
-    }
-
+        }
+    #endif
 
     while(1)
     {
@@ -404,59 +412,59 @@ void main(void)
 
 
 
-
-
-        CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
-
         get_sciB_angle();
         //        DELAY_US(2);
         DELAY_US(can03TxDelay);
 
+        CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
+
+
+
         CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
         can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
-//        DELAY_US(can03RxDelay);
+//        DELAY_US(can03RxDelay);  // 只要加了这句话，can03就会读数为0？
 
 
 
+    #if FALSE
+        // hip
+        can_used = can_pos_ID0x01;
+        sci_used = sciB_pos;
+        // shank
+        can_used = can_pos_ID0x03;
+        sci_used = sciA_pos;
 
-                // hip
-//                can_used = can_pos_ID0x01;
-//                sci_used = sciB_pos;
-        //        // shank
-//                can_used = can_pos_ID0x03;
-//                sci_used = sciA_pos;
-//
-//                deltaPos = (int32)(can_used - can_pos_prev);
-//                if(deltaPos < -65536)
-//                {
-//                    deltaPos += 131072;
-//                }
-//                if(deltaPos > 65536)
-//                {
-//                    deltaPos -= 131072;
-//                }
-//                if( deltaPos < (-1)*dataWidth){
-//                    dataIndex++;
-//                    startRecode = 1;
-//                }else if( deltaPos > dataWidth){
-//                    dataIndex--;
-//                    startRecode = 1;
-//                }
-//
-//                if(dataIndex>=2000){
-//                    dataIndex = 1999;
-//                }else if (dataIndex<0){
-//                    dataIndex = 0;
-//                }
-//
-//                if(startRecode == 1)
-//                {
-//                    can_pos_prev = can_used;
-//                    dataStoreCan[dataIndex] = (REAL)(can_used/131072.0*360.0);
-//                    dataStoreSci[dataIndex] = (REAL)(sci_used/8388608.0*360.0);
-//                    startRecode = 0;
-//                }
+        deltaPos = (int32)(can_used - can_pos_prev);
+        if(deltaPos < -65536)
+        {
+            deltaPos += 131072;
+        }
+        if(deltaPos > 65536)
+        {
+            deltaPos -= 131072;
+        }
+        if( deltaPos < (-1)*dataWidth){
+            dataIndex++;
+            startRecode = 1;
+        }else if( deltaPos > dataWidth){
+            dataIndex--;
+            startRecode = 1;
+        }
 
+        if(dataIndex>=2000){
+            dataIndex = 1999;
+        }else if (dataIndex<0){
+            dataIndex = 0;
+        }
+
+        if(startRecode == 1)
+        {
+            can_pos_prev = can_used;
+            dataStoreCan[dataIndex] = (REAL)(can_used/131072.0*360.0);
+            dataStoreSci[dataIndex] = (REAL)(sci_used/8388608.0*360.0);
+            startRecode = 0;
+        }
+    #endif
     }
 }
 
@@ -588,6 +596,7 @@ interrupt void sciaRxFifoIsr(void)
     }
     sciA_pos = (Uint32)(SciAReceivedChar[4] *65536) + (Uint32)(SciAReceivedChar[3] *256) + (Uint32)(SciAReceivedChar[2]);
 
+    sciARxCount++;
 
     SciaRegs.SCIFFRX.bit.RXFFOVRCLR=1;   // Clear Overflow flag
     SciaRegs.SCIFFRX.bit.RXFFINTCLR=1;   // Clear Interrupt flag
@@ -607,6 +616,7 @@ interrupt void scibRxFifoIsr(void)
     }
     sciB_pos = (Uint32)(SciBReceivedChar[4] *65536) + (Uint32)(SciBReceivedChar[3] *256) + (Uint32)(SciBReceivedChar[2]);
 
+    sciBRxCount++;
     ScibRegs.SCIFFRX.bit.RXFFOVRCLR=1;   // Clear Overflow flag
     ScibRegs.SCIFFRX.bit.RXFFINTCLR=1;   // Clear Interrupt flag
 
