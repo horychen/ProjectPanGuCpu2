@@ -388,9 +388,12 @@ void main(void)
         {
             Write.position_cmd_elec += 0.01;
             Write.speed_cmd_elec -= 0.01;
-
+            // 20240315之前的，sciA小腿，sciB大腿
             Write.SCI_shank_position_count = sciA_pos;
             Write.SCI_hip_position_count  = sciB_pos;
+            // 20240315，调换小白板与uart1、uart2接口连线，sciA大腿，sciB小腿
+            Write.SCI_shank_position_count = sciB_pos;
+            Write.SCI_hip_position_count  = sciA_pos;
             Write.CAN_position_count_ID0x01 = can_pos_ID0x01;
             Write.CAN_position_count_ID0x03 = can_pos_ID0x03;
             // Set a flag to notify CPU02 that data is available
