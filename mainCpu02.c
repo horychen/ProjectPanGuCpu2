@@ -58,6 +58,8 @@ unsigned char ucTXMsgData_ID0x03[8], ucRXMsgData_ID0x03[8];
 #define RX_ID0x03_OBJID 4
 
 // Prototype statements for functions found within this file.
+
+__interrupt void cpu_timer0_isr(void);
 interrupt void sciaRxFifoIsr(void);
 void scia_echoback_init(void);
 void scia_fifo_init(void);
@@ -139,50 +141,8 @@ void get_sciB_angle(){
 
 Uint64 mainWhileLoopCounter = 0;
 
-//声明全局变量
-#if PC_SIMULATION==FALSE
-REAL CpuTimer_Delta_CPU02 = 0;
-Uint32 CpuTimer_Before_CPU02 = 0;
-Uint32 CpuTimer_After_CPU02 = 0;
-#endif
 
-//
-// Main
-//
-void main(void)
-{
-
-
-    //
-    // Wait until Shared RAM is available.
-    //
-    while(!( MemCfgRegs.GSxMSEL.bit.MSEL_GS0))
-    {
-    }
-    START_LED1
-
-    //
-    // Step 1. Initialize System Control:
-    // PLL, WatchDog, enable Peripheral Clocks
-    // This example function is found in the F2837xD_SysCtrl.c file.
-    //
-    InitSysCtrl();
-
-    //
-    // Step 2. Initialize GPIO:
-    // This example function is found in the F2837xD_Gpio.c file and
-    // illustrates how to set the GPIO to it's default state.
-    //
-    // InitGpio();  // Skipped for this example
-
-    // 初始化SPI，用于与DAC芯片MAX5307通讯。
-    //GpioCtrlRegs.GPBMUX2.bit.GPIO57 = 0; // Configure GPIO57 as C\S\ signal for MAX5307
-    InitSpi();
-
-    // for Slessinv TIE.R1 for measuring the execution time
-    InitCpuTimers();
-    ConfigCpuTimer(&CpuTimer1, 200, 1000000); // 200MHz, INTERRUPT_period = 1e6 us
-
+void Setup_CAN_Encoder(){
 
     // Initialize the CAN controller
     CANInit(CANA_BASE);
@@ -207,6 +167,96 @@ void main(void)
     CANBitRateSet(CANA_BASE, 200000000, 500000);
     CANBitRateSet(CANB_BASE, 200000000, 500000);
 
+
+    // Enable the CAN for operation.
+    CANEnable(CANA_BASE);
+    CANEnable(CANB_BASE);
+
+    // Initialize the message object that will be used for sending CAN
+    // messages.
+    sTXCANMessage_ID0x01.ui32MsgID = 1;                     // CAN message ID - use 1
+    sTXCANMessage_ID0x01.ui32MsgIDMask = 0;                 // no mask needed for TX
+    sTXCANMessage_ID0x01.ui32Flags = MSG_OBJ_TX_INT_ENABLE; // enable interrupt on TX
+    sTXCANMessage_ID0x01.ui32MsgLen = 3;                    // size of message is
+    ucTXMsgData_ID0x01[0] = sTXCANMessage_ID0x01.ui32MsgLen;
+    ucTXMsgData_ID0x01[1] = sTXCANMessage_ID0x01.ui32MsgID;
+    ucTXMsgData_ID0x01[2] = 1;
+    sTXCANMessage_ID0x01.pucMsgData = ucTXMsgData_ID0x01; // ptr to message content
+
+    // Initialize the message object that will be used for recieving CAN
+    // messages.
+    *(unsigned long *)ucRXMsgData_ID0x01 = 0;
+    sRXCANMessage_ID0x01.ui32MsgID = 1;                           // CAN message ID - use 1
+    sRXCANMessage_ID0x01.ui32MsgIDMask = 0;                       // no mask needed for TX
+    sRXCANMessage_ID0x01.ui32Flags = MSG_OBJ_NO_FLAGS;            //
+    sRXCANMessage_ID0x01.ui32MsgLen = sizeof(ucRXMsgData_ID0x01); // size of message is 4
+    sRXCANMessage_ID0x01.pucMsgData = ucRXMsgData_ID0x01;         // ptr to message content
+
+    // Initialize the message object that will be used for sending CAN
+    // messages.
+    sTXCANMessage_ID0x03.ui32MsgID = 3;                     // CAN message ID - use 3
+    sTXCANMessage_ID0x03.ui32MsgIDMask = 0;                 // no mask needed for TX
+    sTXCANMessage_ID0x03.ui32Flags = MSG_OBJ_TX_INT_ENABLE; // enable interrupt on TX
+    sTXCANMessage_ID0x03.ui32MsgLen = 3;                    // size of message is
+    ucTXMsgData_ID0x03[0] = sTXCANMessage_ID0x03.ui32MsgLen;
+    ucTXMsgData_ID0x03[1] = sTXCANMessage_ID0x03.ui32MsgID;
+    ucTXMsgData_ID0x03[2] = 1;
+    sTXCANMessage_ID0x03.pucMsgData = ucTXMsgData_ID0x03; // ptr to message content
+
+    // Initialize the message object that will be used for recieving CAN
+    // messages.
+    *(unsigned long *)ucRXMsgData_ID0x03 = 0;
+    sRXCANMessage_ID0x03.ui32MsgID = 3;                        // CAN message ID - use 3
+    sRXCANMessage_ID0x03.ui32MsgIDMask = 0;                   // no mask needed for TX
+    sRXCANMessage_ID0x03.ui32Flags = MSG_OBJ_NO_FLAGS;        //
+    sRXCANMessage_ID0x03.ui32MsgLen = sizeof(ucRXMsgData_ID0x03); // size of message is 4
+    sRXCANMessage_ID0x03.pucMsgData = ucRXMsgData_ID0x03;        // ptr to message content
+
+    // Enter loop to send messages.  A new message will be sent once per
+    // second.  The 4 bytes of message content will be treated as an unsigned
+    // long and incremented by one each time.
+
+    // Setup the message object being used to receive messages
+    CANMessageSet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, MSG_OBJ_TYPE_RX);
+    CANMessageSet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, MSG_OBJ_TYPE_RX);
+
+}
+
+//声明全局变量
+#if PC_SIMULATION==FALSE
+REAL CpuTimer_Delta_CPU02 = 0;
+Uint32 CpuTimer_Before_CPU02 = 0;
+Uint32 CpuTimer_After_CPU02 = 0;
+#endif
+
+//
+// Main
+//
+void main(void){
+    //
+    // Wait until Shared RAM is available.
+    //
+    while(!( MemCfgRegs.GSxMSEL.bit.MSEL_GS0))
+    {
+    }
+
+    //
+    // Step 1. Initialize System Control:
+    // PLL, WatchDog, enable Peripheral Clocks
+    // This example function is found in the F2837xD_SysCtrl.c file.
+    //
+    InitSysCtrl();
+
+    //
+    // Step 2. Initialize GPIO:
+    // This example function is found in the F2837xD_Gpio.c file and
+    // illustrates how to set the GPIO to it's default state.
+    //
+    // InitGpio();  // Skipped for this example
+
+    // 初始化SPI，用于与DAC芯片MAX5307通讯。
+    //GpioCtrlRegs.GPBMUX2.bit.GPIO57 = 0; // Configure GPIO57 as C\S\ signal for MAX5307
+    InitSpi();
 
     //
     // Step 3. Clear all interrupts and initialize PIE vector table:
@@ -253,7 +303,7 @@ void main(void)
     // ISR functions found within this file.
     //
     EALLOW;  // This is needed to write to EALLOW protected registers
-    //PieVectTable.TIMER0_INT = &cpu_timer0_isr;
+    PieVectTable.TIMER0_INT = &cpu_timer0_isr;
     PieVectTable.SCIA_RX_INT = &sciaRxFifoIsr;
     PieVectTable.SCIB_RX_INT = &scibRxFifoIsr;
     EDIS;    // This is needed to disable write to EALLOW protected registers
@@ -262,19 +312,18 @@ void main(void)
     // Step 4. Initialize the Device Peripheral. This function can be
     //         found in F2837xD_CpuTimers.c
     //
-    //InitCpuTimers();   // For this example, only initialize the Cpu Timers
+    InitCpuTimers();  
 
     //
     // Configure CPU-Timer0 to interrupt every second:
-    // c2_FREQ in MHz, 1 second Period (in uSeconds)
-    //
-    //ConfigCpuTimer(&CpuTimer0, 200, 1000000);
+    ConfigCpuTimer(&CpuTimer0, 200, 100);    //
+    ConfigCpuTimer(&CpuTimer1, 200, 1000000);
 
     //
     // To ensure precise timing, use write-only instructions to write to the
     // entire register.
     //
-    //CpuTimer0Regs.TCR.all = 0x4000;
+    CpuTimer0Regs.TCR.all = 0x4000;
 
     //
     // Step 5. User specific code, enable interrupts:
@@ -288,23 +337,25 @@ void main(void)
     //
     // Enable TINT0 in the PIE: Group 1 interrupt 7
     //
-    //PieCtrlRegs.PIEIER1.bit.INTx7 = 1;
 
     PieCtrlRegs.PIECTRL.bit.ENPIE = 1;   // Enable the PIE block
+    PieCtrlRegs.PIEIER1.bit.INTx7 = 1;   // Enable TINT0 in the PIE: Group 1 interrupt 7
     PieCtrlRegs.PIEIER9.bit.INTx1 = 1;   // PIE Group 9, INT1 SCIA receive
     PieCtrlRegs.PIEIER9.bit.INTx3 = 1;   // PIE Group 9, INT1 SCIB receive
-    IER = 0x100;                         // Enable CPU INT
+
+    IER |= M_INT1; // CPU-Timer 0
+    IER |= M_INT9; // SCI Rx                       // Enable CPU INT
     //
     // Enable global Interrupts and higher priority real-time debug events:
     //
     EINT;   // Enable Global interrupt INTM
     ERTM;   // Enable Global realtime interrupt DBGM
 
-    Write.position_cmd_elec = 100;
-    Write.speed_cmd_elec = 600;
-    IPCLtoRFlagSet(IPC_FLAG10);
+    // Write.position_cmd_elec = 100;
+    // Write.speed_cmd_elec = 600;
+    // IPCLtoRFlagSet(IPC_FLAG10);
 
-    START_LED2
+    // START_LED2
 
 
 
@@ -313,60 +364,9 @@ void main(void)
     scib_fifo_init();      // Initialize the SCI FIFO
     scib_echoback_init();  // Initialize SCI for echoback
     // Enable test mode and select external loopback
-//    HWREG(CANA_BASE + CAN_O_CTL) |= CAN_CTL_TEST;
-//    HWREG(CANA_BASE + CAN_O_TEST) = CAN_TEST_EXL;
-
-    // Enable the CAN for operation.
-    CANEnable(CANA_BASE);
-    CANEnable(CANB_BASE);
-
-    // Initialize the message object that will be used for sending CAN
-    // messages.
-    sTXCANMessage_ID0x01.ui32MsgID = 1;                        // CAN message ID - use 1
-    sTXCANMessage_ID0x01.ui32MsgIDMask = 0;                    // no mask needed for TX
-    sTXCANMessage_ID0x01.ui32Flags = MSG_OBJ_TX_INT_ENABLE;    // enable interrupt on TX
-    sTXCANMessage_ID0x01.ui32MsgLen = 3;     // size of message is
-    ucTXMsgData_ID0x01[0] = sTXCANMessage_ID0x01.ui32MsgLen;
-    ucTXMsgData_ID0x01[1] = sTXCANMessage_ID0x01.ui32MsgID;
-    ucTXMsgData_ID0x01[2] = 1;
-    sTXCANMessage_ID0x01.pucMsgData = ucTXMsgData_ID0x01;           // ptr to message content
-
-    // Initialize the message object that will be used for recieving CAN
-    // messages.
-    *(unsigned long *)ucRXMsgData_ID0x01 = 0;
-    sRXCANMessage_ID0x01.ui32MsgID = 1;                        // CAN message ID - use 1
-    sRXCANMessage_ID0x01.ui32MsgIDMask = 0;                    // no mask needed for TX
-    sRXCANMessage_ID0x01.ui32Flags = MSG_OBJ_NO_FLAGS;         //
-    sRXCANMessage_ID0x01.ui32MsgLen = sizeof(ucRXMsgData_ID0x01);     // size of message is 4
-    sRXCANMessage_ID0x01.pucMsgData = ucRXMsgData_ID0x01;           // ptr to message content
-
-    // Initialize the message object that will be used for sending CAN
-    // messages.
-    sTXCANMessage_ID0x03.ui32MsgID = 3;                        // CAN message ID - use 3
-    sTXCANMessage_ID0x03.ui32MsgIDMask = 0;                    // no mask needed for TX
-    sTXCANMessage_ID0x03.ui32Flags = MSG_OBJ_TX_INT_ENABLE;    // enable interrupt on TX
-    sTXCANMessage_ID0x03.ui32MsgLen = 3;     // size of message is
-    ucTXMsgData_ID0x03[0] = sTXCANMessage_ID0x03.ui32MsgLen;
-    ucTXMsgData_ID0x03[1] = sTXCANMessage_ID0x03.ui32MsgID;
-    ucTXMsgData_ID0x03[2] = 1;
-    sTXCANMessage_ID0x03.pucMsgData = ucTXMsgData_ID0x03;           // ptr to message content
-
-    // Initialize the message object that will be used for recieving CAN
-    // messages.
-    *(unsigned long *)ucRXMsgData_ID0x03 = 0;
-    sRXCANMessage_ID0x03.ui32MsgID = 3;                        // CAN message ID - use 3
-    sRXCANMessage_ID0x03.ui32MsgIDMask = 0;                    // no mask needed for TX
-    sRXCANMessage_ID0x03.ui32Flags = MSG_OBJ_NO_FLAGS;         //
-    sRXCANMessage_ID0x03.ui32MsgLen = sizeof(ucRXMsgData_ID0x03);     // size of message is 4
-    sRXCANMessage_ID0x03.pucMsgData = ucRXMsgData_ID0x03;           // ptr to message content
-
-    // Enter loop to send messages.  A new message will be sent once per
-    // second.  The 4 bytes of message content will be treated as an unsigned
-    // long and incremented by one each time.
-
-    // Setup the message object being used to receive messages
-    CANMessageSet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, MSG_OBJ_TYPE_RX);
-    CANMessageSet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, MSG_OBJ_TYPE_RX);
+    //    HWREG(CANA_BASE + CAN_O_CTL) |= CAN_CTL_TEST;
+    //    HWREG(CANA_BASE + CAN_O_TEST) = CAN_TEST_EXL;
+    Setup_CAN_Encoder();
 
     #if FALSE
         int i;
@@ -383,14 +383,7 @@ void main(void)
 
 
 
-        //这段放需要测时间的代码前面
-        #if PC_SIMULATION==FALSE
-        EALLOW;
-        CpuTimer1.RegsAddr->TCR.bit.TRB = 1; // reset cpu timer to period value
-        CpuTimer1.RegsAddr->TCR.bit.TSS = 0; // start/restart
-        CpuTimer_Before_CPU02 = CpuTimer1.RegsAddr->TIM.all; // get count
-        EDIS;
-        #endif
+
 
         // tik1
         if(IPCRtoLFlagBusy(IPC_FLAG7) == 1){
@@ -409,39 +402,21 @@ void main(void)
         // delta1 = 2864 (when SPI_BRR = 6, spi_clk is 14.28MHz)
         // delta1 = 3744 (when SPI_BRR = 9, spi_clk is 10MHz)
 
-        //这段放需要测时间的代码后面，观察CpuTimer_Delta_CPU02的取值，代表经过了多少个 1/200e6 秒。
-        #if PC_SIMULATION==FALSE
-        CpuTimer_After_CPU02 = CpuTimer1.RegsAddr->TIM.all; // get count
-        CpuTimer_Delta_CPU02 = (REAL)CpuTimer_Before_CPU02 - (REAL)CpuTimer_After_CPU02;
-        // EALLOW;
-        // CpuTimer1.RegsAddr->TCR.bit.TSS = 1; // stop (not needed because of the line TRB=1)
-        // EDIS;
-        #endif
 
-        if(IPCLtoRFlagBusy(IPC_FLAG10) == 0) // if not busy
+
+        if(IPCLtoRFlagBusy(IPC_FLAG11) == 0) // if not busy
         {
-            Write.position_cmd_elec += 0.01;
-            Write.speed_cmd_elec -= 0.01;
-            // 20240315之前的，sciA小腿，sciB大腿
-            Write.SCI_shank_position_count = sciA_pos;
-            Write.SCI_hip_position_count  = sciB_pos;
-            // 20240315，调换小白板与uart1、uart2接口连线，sciA大腿，sciB小腿
-            Write.SCI_shank_position_count = sciB_pos;
-            Write.SCI_hip_position_count  = sciA_pos;
             Write.CAN_position_count_ID0x01 = can_pos_ID0x01;
             Write.CAN_position_count_ID0x03 = can_pos_ID0x03;
             // Set a flag to notify CPU02 that data is available
-            IPCLtoRFlagSet(IPC_FLAG10);
+            IPCLtoRFlagSet(IPC_FLAG11);
         }
-
-
 
 
         // tik2
         CANMessageSet(CANA_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
 
         //        DELAY_US(2);
-        get_sciA_angle();
         DELAY_US(can01TxDelay);
 
         CANMessageGet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
@@ -450,8 +425,6 @@ void main(void)
 
 
 
-
-        get_sciB_angle();
         //        DELAY_US(2);
         DELAY_US(can03TxDelay);
 
@@ -650,6 +623,15 @@ interrupt void scibRxFifoIsr(void)
 {
     Uint16 i;
 
+    //这段放需要测时间的代码后面，观察CpuTimer_Delta_CPU02的取值，代表经过了多少个 1/200e6 秒。
+    #if PC_SIMULATION==FALSE
+    CpuTimer_After_CPU02 = CpuTimer1.RegsAddr->TIM.all; // get count
+    CpuTimer_Delta_CPU02 = (REAL)CpuTimer_Before_CPU02 - (REAL)CpuTimer_After_CPU02;
+    // EALLOW;
+    // CpuTimer1.RegsAddr->TCR.bit.TSS = 1; // stop (not needed because of the line TRB=1)
+    // EDIS;
+    #endif
+
     for(i=0;i<6;i++)
     {
        SciBReceivedChar[i]=ScibRegs.SCIRXBUF.all & 0x00FF;  // Read data
@@ -661,20 +643,49 @@ interrupt void scibRxFifoIsr(void)
     ScibRegs.SCIFFRX.bit.RXFFINTCLR=1;   // Clear Interrupt flag
 
     PieCtrlRegs.PIEACK.all|=0x100;       // Issue PIE ack
+
+    //这段放需要测时间的代码前面
+    #if PC_SIMULATION==FALSE
+    EALLOW;
+    CpuTimer1.RegsAddr->TCR.bit.TRB = 1; // reset cpu timer to period value
+    CpuTimer1.RegsAddr->TCR.bit.TSS = 0; // start/restart
+    CpuTimer_Before_CPU02 = CpuTimer1.RegsAddr->TIM.all; // get count
+    EDIS;
+    #endif
+
+
 }
 
 //
 // cpu_timer0_isr - CPU Timer0 ISR
 //
-//__interrupt void cpu_timer0_isr(void)
-//{
-//   EALLOW;
-//   CpuTimer0.InterruptCount++;
-//   GpioDataRegs.GPATOGGLE.bit.GPIO31 = 1;
-//   EDIS;
-//
-//   PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
-//}
+__interrupt void cpu_timer0_isr(void)
+{
+    EALLOW;
+    CpuTimer0.InterruptCount++;
+    GpioDataRegs.GPATOGGLE.bit.GPIO31 = 1;
+    EDIS;
+
+    if (IPCLtoRFlagBusy(IPC_FLAG10) == 0) // if not busy
+    {
+        Write.position_cmd_elec += 0.01;
+        Write.speed_cmd_elec -= 0.01;
+
+        // 20240315之前的，sciA小腿，sciB大腿
+        //      Write.SCI_shank_position_count = sciA_pos;
+        //      Write.SCI_hip_position_count = sciB_pos;
+        // 20240315，调换小白板与uart1、uart2接口连线，sciA大腿，sciB小腿
+        Write.SCI_shank_position_count = sciB_pos;
+        Write.SCI_hip_position_count = sciA_pos;
+        // Set a flag to notify CPU02 that data is available
+        IPCLtoRFlagSet(IPC_FLAG10);
+    }
+
+    get_sciA_angle();
+
+    get_sciB_angle();
+    PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
+}
 
 //
 // End of file
