@@ -87,10 +87,10 @@ int16 dataWidth = 10;
 Uint16 startRecode = 0;
 int16 dataIndex = 0;
 
-int can01TxDelay = 15;
-int can01RxDelay = 15;
-int can03TxDelay = 15;
-int can03RxDelay = 20;
+//int can01TxDelay = 15;
+//int can01RxDelay = 15;
+//int can03TxDelay = 18;
+//int can03RxDelay = 20;
 
 Uint32 sciATxCount = 0;
 Uint32 sciARxCount = 0;
@@ -176,7 +176,7 @@ void Setup_CAN_Encoder(){
     // messages.
     sTXCANMessage_ID0x01.ui32MsgID = 1;                     // CAN message ID - use 1
     sTXCANMessage_ID0x01.ui32MsgIDMask = 0;                 // no mask needed for TX
-    sTXCANMessage_ID0x01.ui32Flags = MSG_OBJ_TX_INT_ENABLE; // enable interrupt on TX
+    sTXCANMessage_ID0x01.ui32Flags = MSG_OBJ_NO_FLAGS; // enable interrupt on TX
     sTXCANMessage_ID0x01.ui32MsgLen = 3;                    // size of message is
     ucTXMsgData_ID0x01[0] = sTXCANMessage_ID0x01.ui32MsgLen;
     ucTXMsgData_ID0x01[1] = sTXCANMessage_ID0x01.ui32MsgID;
@@ -196,7 +196,7 @@ void Setup_CAN_Encoder(){
     // messages.
     sTXCANMessage_ID0x03.ui32MsgID = 3;                     // CAN message ID - use 3
     sTXCANMessage_ID0x03.ui32MsgIDMask = 0;                 // no mask needed for TX
-    sTXCANMessage_ID0x03.ui32Flags = MSG_OBJ_TX_INT_ENABLE; // enable interrupt on TX
+    sTXCANMessage_ID0x03.ui32Flags = MSG_OBJ_NO_FLAGS; // enable interrupt on TX
     sTXCANMessage_ID0x03.ui32MsgLen = 3;                    // size of message is
     ucTXMsgData_ID0x03[0] = sTXCANMessage_ID0x03.ui32MsgLen;
     ucTXMsgData_ID0x03[1] = sTXCANMessage_ID0x03.ui32MsgID;
@@ -223,11 +223,9 @@ void Setup_CAN_Encoder(){
 }
 
 //声明全局变量
-#if PC_SIMULATION==FALSE
 REAL CpuTimer_Delta_CPU02 = 0;
 Uint32 CpuTimer_Before_CPU02 = 0;
 Uint32 CpuTimer_After_CPU02 = 0;
-#endif
 
 //
 // Main
@@ -403,7 +401,6 @@ void main(void){
         // delta1 = 3744 (when SPI_BRR = 9, spi_clk is 10MHz)
 
 
-
         if(IPCLtoRFlagBusy(IPC_FLAG11) == 0) // if not busy
         {
             Write.CAN_position_count_ID0x01 = can_pos_ID0x01;
@@ -412,32 +409,22 @@ void main(void){
             IPCLtoRFlagSet(IPC_FLAG11);
         }
 
-
         // tik2
-        CANMessageSet(CANA_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
 
-        //        DELAY_US(2);
-        DELAY_US(can01TxDelay);
-
+        //        DELAY_US(can01TxDelay);
         CANMessageGet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
         can_pos_ID0x01 = (Uint32)(ucRXMsgData_ID0x01[5]*65536)+ (Uint32)(ucRXMsgData_ID0x01[4] * 256) + (Uint32)(ucRXMsgData_ID0x01[3]);
-        DELAY_US(can01RxDelay);
+        //        DELAY_US(can01RxDelay);   // 只要不加这句话，can03就会读数卡死？
 
 
 
-        //        DELAY_US(2);
-        DELAY_US(can03TxDelay);
-
-        CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
-
-
-
+        //        DELAY_US(can03TxDelay);
         CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
         can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
-//        DELAY_US(can03RxDelay);  // 只要加了这句话，can03就会读数为0？
+        //        DELAY_US(can03RxDelay);  // 只要加了这句话，can03就会读数为0？
+
         // tok2
         // tok2-tik2 = delta2 = 25328
-
 
     #if FALSE
         // hip
@@ -624,14 +611,14 @@ interrupt void scibRxFifoIsr(void)
     Uint16 i;
 
     //这段放需要测时间的代码后面，观察CpuTimer_Delta_CPU02的取值，代表经过了多少个 1/200e6 秒。
-    #if PC_SIMULATION==FALSE
     CpuTimer_After_CPU02 = CpuTimer1.RegsAddr->TIM.all; // get count
     CpuTimer_Delta_CPU02 = (REAL)CpuTimer_Before_CPU02 - (REAL)CpuTimer_After_CPU02;
     // EALLOW;
     // CpuTimer1.RegsAddr->TCR.bit.TSS = 1; // stop (not needed because of the line TRB=1)
     // EDIS;
-    #endif
 
+    //tok3
+    // tok3 -tik3 = 5400
     for(i=0;i<6;i++)
     {
        SciBReceivedChar[i]=ScibRegs.SCIRXBUF.all & 0x00FF;  // Read data
@@ -643,17 +630,6 @@ interrupt void scibRxFifoIsr(void)
     ScibRegs.SCIFFRX.bit.RXFFINTCLR=1;   // Clear Interrupt flag
 
     PieCtrlRegs.PIEACK.all|=0x100;       // Issue PIE ack
-
-    //这段放需要测时间的代码前面
-    #if PC_SIMULATION==FALSE
-    EALLOW;
-    CpuTimer1.RegsAddr->TCR.bit.TRB = 1; // reset cpu timer to period value
-    CpuTimer1.RegsAddr->TCR.bit.TSS = 0; // start/restart
-    CpuTimer_Before_CPU02 = CpuTimer1.RegsAddr->TIM.all; // get count
-    EDIS;
-    #endif
-
-
 }
 
 //
@@ -682,8 +658,19 @@ __interrupt void cpu_timer0_isr(void)
     }
 
     get_sciA_angle();
-
     get_sciB_angle();
+
+    CANMessageSet(CANA_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
+    CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
+
+    // tik3
+    //这段放需要测时间的代码前面
+    EALLOW;
+    CpuTimer1.RegsAddr->TCR.bit.TRB = 1; // reset cpu timer to period value
+    CpuTimer1.RegsAddr->TCR.bit.TSS = 0; // start/restart
+    CpuTimer_Before_CPU02 = CpuTimer1.RegsAddr->TIM.all; // get count
+    EDIS;
+
     PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 }
 

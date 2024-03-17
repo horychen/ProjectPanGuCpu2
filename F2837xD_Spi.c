@@ -26,9 +26,9 @@
 #if CPU_FRQ_200MHZ
 //#define SPI_BRR        ((200E6 / 4) / 500E3) - 1
 
-// LSPCLK = 100MHz, when SPI_BRR+1=7, band rate = 100/7~=14.28MHz < 15MHz
-#define SPI_BRR        6 // 14.28 MHz for high speed SPI
-//#define SPI_BRR        ((200E6 / 4) / 5E6) - 1 // since LSPCK=100MHz, spi clk is 10 MHz
+// LSPCLK = 100MHz, when SPI_BRR+1=7, baud rate = 100/7~=14.28MHz < 15MHz
+#define SPI_BRR        (6) // 14.28 MHz for high speed SPI
+//#define SPI_BRR        ((200E6 / 4) / 5E6) - 1 // since LSPCK=100MHz, spi_clk is 10 MHz
 #endif
 
 #if CPU_FRQ_150MHZ
@@ -81,7 +81,7 @@ void InitSpi(void)
     SpicRegs.SPICTL.bit.SPIINTENA = 0;
 
     // Set the baud rate
-    SpicRegs.SPIBRR.bit.SPI_BIT_RATE = SPI_BRR;
+    SpicRegs.SPIBRR.bit.SPI_BIT_RATE = (Uint16)SPI_BRR;
     //SpiaRegs.SPIBRR = 0x1;           // SPI Baud Rate = LSPCLK/(SPIBRR+1), 根据书上公式，LSPCLK=37.5MHz so=37.5/4=9.375MHz
 
     SpicRegs.SPICCR.all = 0x008F;    // 在改变设置前将RESET清零，并在设置结束后将其置位
