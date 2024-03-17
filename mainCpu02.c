@@ -139,6 +139,13 @@ void get_sciB_angle(){
 
 Uint64 mainWhileLoopCounter = 0;
 
+//声明全局变量
+#if PC_SIMULATION==FALSE
+REAL CpuTimer_Delta_CPU02 = 0;
+Uint32 CpuTimer_Before_CPU02 = 0;
+Uint32 CpuTimer_After_CPU02 = 0;
+#endif
+
 //
 // Main
 //
@@ -172,6 +179,9 @@ void main(void)
     //GpioCtrlRegs.GPBMUX2.bit.GPIO57 = 0; // Configure GPIO57 as C\S\ signal for MAX5307
     InitSpi();
 
+    // for Slessinv TIE.R1 for measuring the execution time
+    InitCpuTimers();
+    ConfigCpuTimer(&CpuTimer1, 200, 1000000); // 200MHz, INTERRUPT_period = 1e6 us
 
 
     // Initialize the CAN controller
@@ -370,6 +380,19 @@ void main(void)
     while(1)
     {
         mainWhileLoopCounter++;
+
+
+
+        //这段放需要测时间的代码前面
+        #if PC_SIMULATION==FALSE
+        EALLOW;
+        CpuTimer1.RegsAddr->TCR.bit.TRB = 1; // reset cpu timer to period value
+        CpuTimer1.RegsAddr->TCR.bit.TSS = 0; // start/restart
+        CpuTimer_Before_CPU02 = CpuTimer1.RegsAddr->TIM.all; // get count
+        EDIS;
+        #endif
+
+        // tik1
         if(IPCRtoLFlagBusy(IPC_FLAG7) == 1){
 
             DAC_MAX5307(1, Read.dac_buffer[0] ); //71us 10khz
@@ -382,7 +405,18 @@ void main(void)
             //            DAC_MAX5307(8, Read.dac_buffer[7] ); //71us 10khz
 
             IPCRtoLFlagAcknowledge (IPC_FLAG7);
-        }
+        }//tok1
+        // delta1 = 2864 (when SPI_BRR = 6, spi_clk is 14.28MHz)
+        // delta1 = 3744 (when SPI_BRR = 9, spi_clk is 10MHz)
+
+        //这段放需要测时间的代码后面，观察CpuTimer_Delta_CPU02的取值，代表经过了多少个 1/200e6 秒。
+        #if PC_SIMULATION==FALSE
+        CpuTimer_After_CPU02 = CpuTimer1.RegsAddr->TIM.all; // get count
+        CpuTimer_Delta_CPU02 = (REAL)CpuTimer_Before_CPU02 - (REAL)CpuTimer_After_CPU02;
+        // EALLOW;
+        // CpuTimer1.RegsAddr->TCR.bit.TSS = 1; // stop (not needed because of the line TRB=1)
+        // EDIS;
+        #endif
 
         if(IPCLtoRFlagBusy(IPC_FLAG10) == 0) // if not busy
         {
@@ -402,6 +436,8 @@ void main(void)
 
 
 
+
+        // tik2
         CANMessageSet(CANA_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
 
         //        DELAY_US(2);
@@ -426,7 +462,8 @@ void main(void)
         CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
         can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
 //        DELAY_US(can03RxDelay);  // 只要加了这句话，can03就会读数为0？
-
+        // tok2
+        // tok2-tik2 = delta2 = 25328
 
 
     #if FALSE

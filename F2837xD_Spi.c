@@ -25,8 +25,10 @@
 //
 #if CPU_FRQ_200MHZ
 //#define SPI_BRR        ((200E6 / 4) / 500E3) - 1
-#define SPI_BRR        ((200E6 / 4) / 5E6) - 1 // 5 MHz for high speed SPI
-//#define SPI_BRR        ((200E6 / 4) / 5E6) - 1 // 5 MHz
+
+// LSPCLK = 100MHz, when SPI_BRR+1=7, band rate = 100/7~=14.28MHz < 15MHz
+#define SPI_BRR        6 // 14.28 MHz for high speed SPI
+//#define SPI_BRR        ((200E6 / 4) / 5E6) - 1 // since LSPCK=100MHz, spi clk is 10 MHz
 #endif
 
 #if CPU_FRQ_150MHZ
