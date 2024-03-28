@@ -96,6 +96,8 @@ Uint32 sciATxCount = 0;
 Uint32 sciARxCount = 0;
 Uint32 sciBTxCount = 0;
 Uint32 sciBRxCount = 0;
+Uint32 sciARXErrCount = 0;
+Uint32 sciBRXErrCount = 0;
 
 // 注意，Eureka扩展板和测试板使用的WE信号管脚不同
 #define EUREKA_BOARD
@@ -119,7 +121,12 @@ void get_sciA_angle(){
     // 半双工模式
     ENCODER485_shank_WRITE_ENABLE
     scia_xmit(2);
+    if(SciaRegs.SCIRXST.bit.RXERROR == 1){
+        SciaRegs.SCICTL1.bit.SWRESET = 0;
+        sciARXErrCount ++;
+    }
     DELAY_US(5);
+    SciaRegs.SCICTL1.bit.SWRESET = 1;//SW RESET disable
     sciATxCount++;
     ENCODER485_shank_WRITE_DISABLE
 }
@@ -133,7 +140,12 @@ void get_sciB_angle(){
     // 半双工模式
     ENCODER485_HIP_WRITE_ENABLE
     scib_xmit(2);
+    if(ScibRegs.SCIRXST.bit.RXERROR == 1){
+        ScibRegs.SCICTL1.bit.SWRESET = 0;
+        sciBRXErrCount ++;
+    }
     DELAY_US(5);
+    ScibRegs.SCICTL1.bit.SWRESET = 1;//SW RESET disable
     sciBTxCount++;
     ENCODER485_HIP_WRITE_DISABLE
 }
@@ -187,8 +199,8 @@ void Setup_CAN_Encoder(){
     // messages.
     *(unsigned long *)ucRXMsgData_ID0x01 = 0;
     sRXCANMessage_ID0x01.ui32MsgID = 1;                           // CAN message ID - use 1
-    sRXCANMessage_ID0x01.ui32MsgIDMask = 0;                       // no mask needed for TX
-    sRXCANMessage_ID0x01.ui32Flags = MSG_OBJ_NO_FLAGS;            //
+    sRXCANMessage_ID0x01.ui32MsgIDMask = 1;                       // no mask needed for TX
+    sRXCANMessage_ID0x01.ui32Flags = MSG_OBJ_USE_ID_FILTER;            //
     sRXCANMessage_ID0x01.ui32MsgLen = sizeof(ucRXMsgData_ID0x01); // size of message is 4
     sRXCANMessage_ID0x01.pucMsgData = ucRXMsgData_ID0x01;         // ptr to message content
 
@@ -207,8 +219,8 @@ void Setup_CAN_Encoder(){
     // messages.
     *(unsigned long *)ucRXMsgData_ID0x03 = 0;
     sRXCANMessage_ID0x03.ui32MsgID = 3;                        // CAN message ID - use 3
-    sRXCANMessage_ID0x03.ui32MsgIDMask = 0;                   // no mask needed for TX
-    sRXCANMessage_ID0x03.ui32Flags = MSG_OBJ_NO_FLAGS;        //
+    sRXCANMessage_ID0x03.ui32MsgIDMask = 3;                   // no mask needed for TX
+    sRXCANMessage_ID0x03.ui32Flags = MSG_OBJ_USE_ID_FILTER;        //
     sRXCANMessage_ID0x03.ui32MsgLen = sizeof(ucRXMsgData_ID0x03); // size of message is 4
     sRXCANMessage_ID0x03.pucMsgData = ucRXMsgData_ID0x03;        // ptr to message content
 
@@ -217,7 +229,7 @@ void Setup_CAN_Encoder(){
     // long and incremented by one each time.
 
     // Setup the message object being used to receive messages
-    CANMessageSet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, MSG_OBJ_TYPE_RX);
+    CANMessageSet(CANB_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, MSG_OBJ_TYPE_RX);
     CANMessageSet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, MSG_OBJ_TYPE_RX);
 
 }
@@ -412,7 +424,7 @@ void main(void){
         // tik2
 
         //        DELAY_US(can01TxDelay);
-        CANMessageGet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
+        CANMessageGet(CANB_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
         can_pos_ID0x01 = (Uint32)(ucRXMsgData_ID0x01[5]*65536)+ (Uint32)(ucRXMsgData_ID0x01[4] * 256) + (Uint32)(ucRXMsgData_ID0x01[3]);
         //        DELAY_US(can01RxDelay);   // 只要不加这句话，can03就会读数卡死？
 
@@ -660,8 +672,8 @@ __interrupt void cpu_timer0_isr(void)
     get_sciA_angle();
     get_sciB_angle();
 
-    CANMessageSet(CANA_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
     CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
+    CANMessageSet(CANB_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
 
     // tik3
     //这段放需要测时间的代码前面
