@@ -103,10 +103,10 @@ Uint32 sciBRXErrCount = 0;
 #define EUREKA_BOARD
 
 #ifdef EUREKA_BOARD
-#define ENCODER485_shank_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO139 = 1;
-#define ENCODER485_shank_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO139 = 1;
-#define ENCODER485_HIP_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO140 = 1;
-#define ENCODER485_HIP_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO140 = 1;
+#define ENCODER485_shank_WRITE_ENABLE  GpioDataRegs.GPBSET.bit.GPIO37 = 1;
+#define ENCODER485_shank_WRITE_DISABLE  GpioDataRegs.GPBCLEAR.bit.GPIO37 = 1;
+#define ENCODER485_HIP_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO31 = 1;
+#define ENCODER485_HIP_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO31 = 1;
 #else
 #define ENCODER485_shank_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO8 = 1;
 #define ENCODER485_shank_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO8 = 1;
@@ -402,10 +402,10 @@ void main(void){
             DAC_MAX5307(2, Read.dac_buffer[1] ); //71us 10khz
             DAC_MAX5307(3, Read.dac_buffer[2] ); //71us 10khz
             DAC_MAX5307(4, Read.dac_buffer[3] ); //71us 10khz
-            //            DAC_MAX5307(5, Read.dac_buffer[4] ); //71us 10khz
-            //            DAC_MAX5307(6, Read.dac_buffer[5] ); //71us 10khz
-            //            DAC_MAX5307(7, Read.dac_buffer[6] ); //71us 10khz
-            //            DAC_MAX5307(8, Read.dac_buffer[7] ); //71us 10khz
+            DAC_MAX5307(5, Read.dac_buffer[4] ); //71us 10khz
+            DAC_MAX5307(6, Read.dac_buffer[5] ); //71us 10khz
+            DAC_MAX5307(7, Read.dac_buffer[6] ); //71us 10khz
+            DAC_MAX5307(8, Read.dac_buffer[7] ); //71us 10khz
 
             IPCRtoLFlagAcknowledge (IPC_FLAG7);
         }//tok1
@@ -651,7 +651,7 @@ __interrupt void cpu_timer0_isr(void)
 {
     EALLOW;
     CpuTimer0.InterruptCount++;
-    GpioDataRegs.GPATOGGLE.bit.GPIO31 = 1;
+    // GpioDataRegs.GPATOGGLE.bit.GPIO31 = 1;
     EDIS;
 
     if (IPCLtoRFlagBusy(IPC_FLAG10) == 0) // if not busy
