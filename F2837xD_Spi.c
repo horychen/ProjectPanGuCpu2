@@ -66,7 +66,7 @@ void InitSpi(void)
     // Disable loop-back
     SpicRegs.SPICCR.bit.SPISWRESET = 0;
     SpicRegs.SPICCR.bit.CLKPOLARITY = 0;
-    SpicRegs.SPICCR.bit.SPICHAR = (16-1);
+    SpicRegs.SPICCR.bit.SPICHAR = (8-1);
     //SpiaRegs.SPICCR.bit.SPILBK = 1; // This makes MAX5307 send DAC signal to the oscilloscope??? No, it does not! 231010 cjh, make sure GPIO57 is changed GPIO61
     SpicRegs.SPICCR.bit.SPILBK = 0; //
 
@@ -84,7 +84,7 @@ void InitSpi(void)
     SpicRegs.SPIBRR.bit.SPI_BIT_RATE = (Uint16)SPI_BRR;
     //SpiaRegs.SPIBRR = 0x1;           // SPI Baud Rate = LSPCLK/(SPIBRR+1), 根据书上公式，LSPCLK=37.5MHz so=37.5/4=9.375MHz
 
-    SpicRegs.SPICCR.all = 0x008F;    // 在改变设置前将RESET清零，并在设置结束后将其置位
+    SpicRegs.SPICCR.all = 0x0087;    // 在改变设置前将RESET清零，并在设置结束后将其置位
 
     // Set FREE bit
     // Halting on a breakpoint will not halt the SPI
@@ -97,7 +97,11 @@ void InitSpi(void)
     NOP;
     GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;           //cs=0
 
-    SpicRegs.SPITXBUF=0xfffc;                       //MAX5307唤醒字符
+    SpicRegs.SPITXBUF=0x4000;
+    while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
+    SpicRegs.SPITXBUF=0xFF00;
+    while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
+    SpicRegs.SPITXBUF=0x0000;   //MAX5725唤醒字符
     while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
 
     GpioDataRegs.GPCSET.bit.GPIO72 = 1;             //cs=1为下一次做准备

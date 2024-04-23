@@ -398,14 +398,23 @@ void main(void){
         // tik1
         if(IPCRtoLFlagBusy(IPC_FLAG7) == 1){
 
-            DAC_MAX5307(1, Read.dac_buffer[0] ); //71us 10khz
-            DAC_MAX5307(2, Read.dac_buffer[1] ); //71us 10khz
-            DAC_MAX5307(3, Read.dac_buffer[2] ); //71us 10khz
-            DAC_MAX5307(4, Read.dac_buffer[3] ); //71us 10khz
-            DAC_MAX5307(5, Read.dac_buffer[4] ); //71us 10khz
-            DAC_MAX5307(6, Read.dac_buffer[5] ); //71us 10khz
-            DAC_MAX5307(7, Read.dac_buffer[6] ); //71us 10khz
-            DAC_MAX5307(8, Read.dac_buffer[7] ); //71us 10khz
+            DAC_MAX5725(1, Read.dac_buffer[0] ); //71us 10khz
+            DAC_MAX5725(2, Read.dac_buffer[1] ); //71us 10khz
+            DAC_MAX5725(3, Read.dac_buffer[2] ); //71us 10khz
+            DAC_MAX5725(4, Read.dac_buffer[3] ); //71us 10khz
+            DAC_MAX5725(5, Read.dac_buffer[4] ); //71us 10khz
+            DAC_MAX5725(6, Read.dac_buffer[5] ); //71us 10khz
+            DAC_MAX5725(7, Read.dac_buffer[6] ); //71us 10khz
+            DAC_MAX5725(8, Read.dac_buffer[7] ); //71us 10khz
+
+            //    DAC_MAX5307(1, Read.dac_buffer[0] ); //71us 10khz
+            //    DAC_MAX5307(2, Read.dac_buffer[1] ); //71us 10khz
+            //    DAC_MAX5307(3, Read.dac_buffer[2] ); //71us 10khz
+            //    DAC_MAX5307(4, Read.dac_buffer[3] ); //71us 10khz
+            //    DAC_MAX5307(5, Read.dac_buffer[4] ); //71us 10khz
+            //    DAC_MAX5307(6, Read.dac_buffer[5] ); //71us 10khz
+            //    DAC_MAX5307(7, Read.dac_buffer[6] ); //71us 10khz
+            //    DAC_MAX5307(8, Read.dac_buffer[7] ); //71us 10khz
 
             IPCRtoLFlagAcknowledge (IPC_FLAG7);
         }//tok1
