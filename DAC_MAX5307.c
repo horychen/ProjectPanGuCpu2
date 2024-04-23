@@ -4,7 +4,7 @@
 void DAC_MAX5725(int channel_number, REAL dac_value)
 {
     // effective range for dac_value is in [-1, 1]//=-3V-3V for scope
-    int32 b = (dac_value + 1.0)*2048;
+    Uint16 b = (dac_value + 1.0)*2048;
 
     // Offset
     //b += dac_offset[a-1];
@@ -29,68 +29,100 @@ void DAC_MAX5725(int channel_number, REAL dac_value)
     switch(channel_number)
     {
         case 1 :
-            SpicRegs.SPITXBUF=0xB0<<8;
+            SpicRegs.SPITXBUF = ( (0xB0<<4) | (b>>8) ) << 4;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=((b>>4)&0xFF)<<8;
+
+            SpicRegs.SPICCR.bit.SPISWRESET = 0; // 清除中断标志位
+            NOP;
+            NOP;
+            SpicRegs.SPICCR.bit.SPISWRESET = 1;
+
+            SpicRegs.SPITXBUF = b<<8;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=(b&0x0F)<<12;                 //DAC_A
-            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
             break;
         case 2 :
-            SpicRegs.SPITXBUF=0xB1<<8;
+            SpicRegs.SPITXBUF = ( (0xB1<<4) | (b>>8) ) << 4;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=((b>>4)&0xFF)<<8;
+
+            SpicRegs.SPICCR.bit.SPISWRESET = 0; // 清除中断标志位
+            NOP;
+            NOP;
+            SpicRegs.SPICCR.bit.SPISWRESET = 1;
+
+            SpicRegs.SPITXBUF = b<<8;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=(b&0x0F)<<12;                  //DAC_B
-            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
             break;
         case 3 :
-            SpicRegs.SPITXBUF=0xB2<<8;
+            SpicRegs.SPITXBUF = ( (0xB2<<4) | (b>>8) ) << 4;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=((b>>4)&0xFF)<<8;
+
+            SpicRegs.SPICCR.bit.SPISWRESET = 0; // 清除中断标志位
+            NOP;
+            NOP;
+            SpicRegs.SPICCR.bit.SPISWRESET = 1;
+
+            SpicRegs.SPITXBUF = b<<8;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=(b&0x0F)<<12;              //DAC_C
-            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
             break;
         case 4 :
-            SpicRegs.SPITXBUF=0xB3<<8;
+            SpicRegs.SPITXBUF = ( (0xB3<<4) | (b>>8) ) << 4;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=((b>>4)&0xFF)<<8;
+
+            SpicRegs.SPICCR.bit.SPISWRESET = 0; // 清除中断标志位
+            NOP;
+            NOP;
+            SpicRegs.SPICCR.bit.SPISWRESET = 1;
+
+            SpicRegs.SPITXBUF = b<<8;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=(b&0x0F)<<12;                  //DAC_D
-            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
             break;
         case 5 :
-            SpicRegs.SPITXBUF=0xB4<<8;
+            SpicRegs.SPITXBUF = ( (0xB4<<4) | (b>>8) ) << 4;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=((b>>4)&0xFF)<<8;
+
+            SpicRegs.SPICCR.bit.SPISWRESET = 0; // 清除中断标志位
+            NOP;
+            NOP;
+            SpicRegs.SPICCR.bit.SPISWRESET = 1;
+
+            SpicRegs.SPITXBUF = b<<8;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=(b&0x0F)<<12;                  //DAC_E
-            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
             break;
         case 6 :
-            SpicRegs.SPITXBUF=0xB5<<8;
+            SpicRegs.SPITXBUF = ( (0xB5<<4) | (b>>8) ) << 4;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=((b>>4)&0xFF)<<8;
+
+            SpicRegs.SPICCR.bit.SPISWRESET = 0; // 清除中断标志位
+            NOP;
+            NOP;
+            SpicRegs.SPICCR.bit.SPISWRESET = 1;
+
+            SpicRegs.SPITXBUF = b<<8;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=(b&0x0F)<<12;                  //DAC_F
-            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
             break;
         case 7 :
-            SpicRegs.SPITXBUF=0xB6<<8;
+            SpicRegs.SPITXBUF = ( (0xB6<<4) | (b>>8) ) << 4;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=((b>>4)&0xFF)<<8;
+
+            SpicRegs.SPICCR.bit.SPISWRESET = 0; // 清除中断标志位
+            NOP;
+            NOP;
+            SpicRegs.SPICCR.bit.SPISWRESET = 1;
+
+            SpicRegs.SPITXBUF = b<<8;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=(b&0x0F)<<12;                  //DAC_G
-            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
             break;
         case 8 :
-            SpicRegs.SPITXBUF=0xB7<<8;
+            SpicRegs.SPITXBUF = ( (0xB7<<4) | (b>>8) ) << 4;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=((b>>4)&0xFF)<<8;
+
+            SpicRegs.SPICCR.bit.SPISWRESET = 0; // 清除中断标志位
+            NOP;
+            NOP;
+            SpicRegs.SPICCR.bit.SPISWRESET = 1;
+
+            SpicRegs.SPITXBUF = b<<8;
             while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // 数据传完后INT_FLAG会置位
-            SpicRegs.SPITXBUF=(b&0x0F)<<12;                  //DAC_H
-            while(SpicRegs.SPISTS.bit.INT_FLAG!=1){}    //!=1 ==0
             break;
         default :
             NOP;
@@ -107,21 +139,12 @@ void DAC_MAX5725(int channel_number, REAL dac_value)
     NOP;
     GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
 
-    SpicRegs.SPITXBUF=0xEFF0;
-
-    while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}
-
-    SpicRegs.SPICCR.bit.SPISWRESET=0;
-    NOP;
-    NOP;
-    SpicRegs.SPICCR.bit.SPISWRESET=1;
-
 }
 
 void DAC_MAX5307(int channel_number, REAL dac_value)
 {
     // effective range for dac_value is in [-1, 1]//=-3V-3V for scope
-    int32 b = (dac_value + 1.0)*2048;
+    int16 b = (dac_value + 1.0)*2048;
 
     // Offset
     //b += dac_offset[a-1];
@@ -182,7 +205,7 @@ void DAC_MAX5307(int channel_number, REAL dac_value)
             break;
     }
 
-    SpicRegs.SPICCR.bit.SPISWRESET = 0;
+    SpicRegs.SPICCR.bit.SPISWRESET = 0; // 清标志位
     NOP;
     NOP;
     SpicRegs.SPICCR.bit.SPISWRESET = 1;
@@ -193,7 +216,6 @@ void DAC_MAX5307(int channel_number, REAL dac_value)
     GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;
 
     SpicRegs.SPITXBUF=0xEFF0;
-
     while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}
 
     SpicRegs.SPICCR.bit.SPISWRESET=0;
