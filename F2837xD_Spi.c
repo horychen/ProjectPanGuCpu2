@@ -27,7 +27,9 @@
 //#define SPI_BRR        ((200E6 / 4) / 500E3) - 1
 
 // LSPCLK = 100MHz, when SPI_BRR+1=7, baud rate = 100/7~=14.28MHz < 15MHz
-// #define SPI_BRR        (6) // 14.28 MHz for high speed SPI
+
+//#define SPI_BRR        (12) // Formula : 100/(BBR+1) = SPI Baud Rate
+//#define SPI_BRR        (6) // 14.28 MHz for high speed SPI
 #define SPI_BRR        (3) // 25 MHz for high speed SPI
 //#define SPI_BRR        ((200E6 / 4) / 5E6) - 1 // since LSPCK=100MHz, spi_clk is 10 MHz
 #endif
@@ -86,7 +88,7 @@ void InitSpi(void)
         SpicRegs.SPIBRR.bit.SPI_BIT_RATE = (Uint16)SPI_BRR;
         //SpiaRegs.SPIBRR = 0x1;           // SPI Baud Rate = LSPCLK/(SPIBRR+1), 根据书上公式，LSPCLK=37.5MHz so=37.5/4=9.375MHz
 
-        // SpicRegs.SPICCR.all = 0x008F;    // 在改变设置前将RESET清零，并在设置结束后将其置位
+        // SpicRegs.SPICCR.all = 0x008F   ;    // 在改变设置前将RESET清零，并在设置结束后将其置位
             //    18.4.3 Configuring the SPI for High-Speed Mode
             // SpiaRegs.SPICCR.bit.HS_MODE = 0x1;
 
