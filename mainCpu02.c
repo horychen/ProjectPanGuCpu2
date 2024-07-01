@@ -102,16 +102,22 @@ Uint32 sciBRXErrCount = 0;
 // 注意，Eureka扩展板和测试板使用的WE信号管脚不同
 #define EUREKA_BOARD
 
-#ifdef EUREKA_BOARD
-#define ENCODER485_shank_WRITE_ENABLE  GpioDataRegs.GPBSET.bit.GPIO37 = 1;
-#define ENCODER485_shank_WRITE_DISABLE  GpioDataRegs.GPBCLEAR.bit.GPIO37 = 1;
-#define ENCODER485_HIP_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO31 = 1;
-#define ENCODER485_HIP_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO31 = 1;
+#ifdef _LEG_GROUP
+    #define ENCODER485_shank_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO139 = 1;
+    #define ENCODER485_shank_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO139 = 1;
+    #define ENCODER485_HIP_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO140 = 1;
+    #define ENCODER485_HIP_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO140 = 1;
 #else
-#define ENCODER485_shank_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO8 = 1;
-#define ENCODER485_shank_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO8 = 1;
+    #ifdef _MOTOR_GROUP
+        #define ENCODER485_shank_WRITE_ENABLE  GpioDataRegs.GPBSET.bit.GPIO37 = 1;
+        #define ENCODER485_shank_WRITE_DISABLE  GpioDataRegs.GPBCLEAR.bit.GPIO37 = 1;
+        #define ENCODER485_HIP_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO31 = 1;
+        #define ENCODER485_HIP_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO31 = 1;
+    #else
+        #define ENCODER485_shank_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO8 = 1;
+        #define ENCODER485_shank_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO8 = 1;
+    #endif
 #endif
-
 void get_sciA_angle(){
 
     SciaRegs.SCIFFRX.bit.RXFIFORESET = 0;
@@ -266,7 +272,13 @@ void main(void){
 
     // 初始化SPI，用于与DAC芯片MAX5307通讯。
     //GpioCtrlRegs.GPBMUX2.bit.GPIO57 = 0; // Configure GPIO57 as C\S\ signal for MAX5307
-    InitSpi();
+#ifdef _LEG_GROUP
+    InitSpi4MAX5307();
+#else
+#ifdef _MOTOR_GROUP
+    InitSpi4MAX5725();
+#endif
+#endif
 
     //
     // Step 3. Clear all interrupts and initialize PIE vector table:
@@ -397,7 +409,17 @@ void main(void){
 
         // tik1
         if(IPCRtoLFlagBusy(IPC_FLAG7) == 1){
-
+#ifdef _LEG_GROUP
+            DAC_MAX5307(1, Read.dac_buffer[0] ); //71us 10khz
+            DAC_MAX5307(2, Read.dac_buffer[1] ); //71us 10khz
+            DAC_MAX5307(3, Read.dac_buffer[2] ); //71us 10khz
+            DAC_MAX5307(4, Read.dac_buffer[3] ); //71us 10khz
+            DAC_MAX5307(5, Read.dac_buffer[4] ); //71us 10khz
+            DAC_MAX5307(6, Read.dac_buffer[5] ); //71us 10khz
+            DAC_MAX5307(7, Read.dac_buffer[6] ); //71us 10khz
+            DAC_MAX5307(8, Read.dac_buffer[7] ); //71us 10khz
+#else
+#ifdef _MOTOR_GROUP
             DAC_MAX5725(1, Read.dac_buffer[0] ); //71us 10khz
             DAC_MAX5725(2, Read.dac_buffer[1] ); //71us 10khz
             DAC_MAX5725(3, Read.dac_buffer[2] ); //71us 10khz
@@ -406,16 +428,8 @@ void main(void){
             DAC_MAX5725(6, Read.dac_buffer[5] ); //71us 10khz
             DAC_MAX5725(7, Read.dac_buffer[6] ); //71us 10khz
             DAC_MAX5725(8, Read.dac_buffer[7] ); //71us 10khz
-
-            //    DAC_MAX5307(1, Read.dac_buffer[0] ); //71us 10khz
-            //    DAC_MAX5307(2, Read.dac_buffer[1] ); //71us 10khz
-            //    DAC_MAX5307(3, Read.dac_buffer[2] ); //71us 10khz
-            //    DAC_MAX5307(4, Read.dac_buffer[3] ); //71us 10khz
-            //    DAC_MAX5307(5, Read.dac_buffer[4] ); //71us 10khz
-            //    DAC_MAX5307(6, Read.dac_buffer[5] ); //71us 10khz
-            //    DAC_MAX5307(7, Read.dac_buffer[6] ); //71us 10khz
-            //    DAC_MAX5307(8, Read.dac_buffer[7] ); //71us 10khz
-
+#endif
+#endif
             IPCRtoLFlagAcknowledge (IPC_FLAG7);
         }//tok1
         // delta1 = 2864 (when SPI_BRR = 6, spi_clk is 14.28MHz)
