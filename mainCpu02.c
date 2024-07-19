@@ -68,8 +68,17 @@ interrupt void scibRxFifoIsr(void);
 void scib_echoback_init(void);
 void scib_fifo_init(void);
 void scib_xmit(int a);
+void talk2PC();
+interrupt void scicRxFifoIsr(void);
+void scic_echoback_init(void);
+void scic_fifo_init(void);
+void scic_xmit(uint8_t a);
 unsigned char SciAReceivedChar[6];
 unsigned char SciBReceivedChar[6];
+
+unsigned char SciCommandFromPC;
+bool talk2PCFlag = false;
+
 Uint32 sciA_pos;
 Uint32 sciB_pos;
 Uint32 can_pos_ID0x01;
@@ -316,6 +325,7 @@ void main(void){
     PieVectTable.TIMER0_INT = &cpu_timer0_isr;
     PieVectTable.SCIA_RX_INT = &sciaRxFifoIsr;
     PieVectTable.SCIB_RX_INT = &scibRxFifoIsr;
+    PieVectTable.SCIC_RX_INT = &scicRxFifoIsr; // talk2PC
     EDIS;    // This is needed to disable write to EALLOW protected registers
 
     //
@@ -348,13 +358,17 @@ void main(void){
     // Enable TINT0 in the PIE: Group 1 interrupt 7
     //
 
+
+    // refer to doc "TMS320F2837xD Dual-Core Real-Time Microcontrollers Technical Reference Manual (spruhm8k)" 3.4.5 PIE Channel Mapping
     PieCtrlRegs.PIECTRL.bit.ENPIE = 1;   // Enable the PIE block
     PieCtrlRegs.PIEIER1.bit.INTx7 = 1;   // Enable TINT0 in the PIE: Group 1 interrupt 7
     PieCtrlRegs.PIEIER9.bit.INTx1 = 1;   // PIE Group 9, INT1 SCIA receive
-    PieCtrlRegs.PIEIER9.bit.INTx3 = 1;   // PIE Group 9, INT1 SCIB receive
+    PieCtrlRegs.PIEIER9.bit.INTx3 = 1;   // PIE Group 9, INT3 SCIB receive
+    PieCtrlRegs.PIEIER8.bit.INTx5 = 1;   // PIE Group 8, INT5 SCIC RX
 
     IER |= M_INT1; // CPU-Timer 0
     IER |= M_INT9; // SCI Rx                       // Enable CPU INT
+    IER |= M_INT8; // SCI Rx   
     //
     // Enable global Interrupts and higher priority real-time debug events:
     //
@@ -390,7 +404,7 @@ void main(void){
     while(1)
     {
         mainWhileLoopCounter++;
-
+        talk2PC();
 
 
 
@@ -541,6 +555,37 @@ void scib_echoback_init()
 
     ScibRegs.SCICTL1.all =0x0023;  // Relinquish SCI from Reset
 }
+
+void scic_echoback_init()
+{
+    // Note: Clocks were turned on to the SCIA peripheral
+    // in the InitSysCtrl() function
+
+    ScicRegs.SCICCR.all =0x0007;   // 1 stop bit,  No loopback
+                                   // No parity,8 char bits,
+                                   // async mode, idle-line protocol
+
+//    ScicRegs.SCICCR.bit.PARITYENA =1;
+    ScicRegs.SCICTL1.all =0x0003;  // enable TX, RX, internal SCICLK,
+                                   // Disable RX ERR, SLEEP, TXWAKE
+    ScicRegs.SCICTL2.all =0x0003;
+    // ScicRegs.SCICTL2.bit.TXINTENA =1; same to SCICTL2.all = 0x0003
+    // ScicRegs.SCICTL2.bit.RXBKINTENA =1;
+
+//    ScicRegs.SCIHBAUD.all    =0x0002;  // 9600 baud @LSPCLK = 50MHz (200 MHz SYSCLK).
+//    ScicRegs.SCILBAUD.all    =0x008B;
+//    ScicRegs.SCIHBAUD.all    =0x0001;  // 14400 baud @LSPCLK = 50MHz (200 MHz SYSCLK).
+//    ScicRegs.SCILBAUD.all    =0x00B1;
+//    ScicRegs.SCIHBAUD.all    =0x0003;  // 14400 baud @LSPCLK = 100MHz (200 MHz SYSCLK).
+//    ScicRegs.SCILBAUD.all    =0x0063;
+//    ScicRegs.SCIHBAUD.all =0x0000; //LSPCLK=100M
+//    ScicRegs.SCILBAUD.all =0x0018; //CLK=0.5M
+
+    ScicRegs.SCIHBAUD.all =0x0000; //LSPCLK=100M
+    ScicRegs.SCILBAUD.all =0x0004; //CLK=2.5M
+
+    ScicRegs.SCICTL1.all =0x0023;  // Relinquish SCI from Reset
+}
 // Transmit a character from the SCI
 void scia_xmit(int a)
 {
@@ -555,6 +600,14 @@ void scib_xmit(int a)
     ScibRegs.SCITXBUF.all =a;
 
 }
+
+void scic_xmit(uint8_t a)
+{
+    while (ScicRegs.SCIFFTX.bit.TXFFST != 0) {}
+    ScicRegs.SCITXBUF.all =a;
+
+}
+
 void scia_msg(char * msg)
 {
     int i;
@@ -572,6 +625,17 @@ void scib_msg(char * msg)
     while(msg[i] != '\0')
     {
         scib_xmit(msg[i]);
+        i++;
+    }
+}
+
+void scic_msg(char * msg)
+{
+    int i;
+    i = 0;
+    while(msg[i] != '\0')
+    {
+        scic_xmit(msg[i]);
         i++;
     }
 }
@@ -595,6 +659,20 @@ void scib_fifo_init()
     ScibRegs.SCIFFTX.bit.TXFIFORESET = 1;
     ScibRegs.SCIFFRX.bit.RXFIFORESET = 1;
 }
+
+void scic_fifo_init()
+{
+    ScicRegs.SCIFFTX.all=0xC040;
+
+    ScicRegs.SCIFFRX.all=0x2021; //1 word raise interrupt(receive command from pc)
+
+    ScicRegs.SCIFFCT.all=0x0;
+
+    ScicRegs.SCIFFTX.bit.TXFIFORESET = 1;
+    ScicRegs.SCIFFRX.bit.RXFIFORESET = 1;
+}
+
+
 //
 // sciaRxFifoIsr - SCIA Receive FIFO ISR
 //
@@ -644,6 +722,64 @@ interrupt void scibRxFifoIsr(void)
     PieCtrlRegs.PIEACK.all|=0x100;       // Issue PIE ack
 }
 
+
+interrupt void scicRxFifoIsr(void)
+{
+    Uint16 i;
+
+    SciCommandFromPC =ScicRegs.SCIRXBUF.all & 0x00FF;  // Read data
+    talk2PCFlag = true;
+    ScicRegs.SCIFFRX.bit.RXFFOVRCLR=1;   // Clear Overflow flag
+    ScicRegs.SCIFFRX.bit.RXFFINTCLR=1;   // Clear Interrupt flag
+
+    PieCtrlRegs.PIEACK.all |= PIEACK_GROUP8;       //Acknowledge PIE Interrupt Group 8
+}
+
+void talk2PC(){
+    if(!talk2PCFlag)return;
+    talk2PCFlag = false;
+    switch (SciCommandFromPC){
+        case 0x02://transmit id
+            REAL idScale = Read.Read_id;
+            if(idScale > 100.0f){
+                idScale = 100.0f
+            }      
+            if(idScale< -100.0f){
+                idScale = -100.0f
+            }
+            idScale *= 100.0f;
+            int16_t integer_id = (int16_t)idScale;
+            uint8_t sendbyte = ((integer_id >> 8) & 0xFF);
+            scic_xmit(sendbyte); // high 8 bits
+            sendbyte = (integer_id & 0xFF);
+            scic_xmit(sendbyte); // low 8 bits
+            break;
+        case 0x05://transmit iq
+            REAL iqScale = Read.Read_iq;
+            if(iqScale > 100.0f){
+                iqScale = 100.0f
+            }      
+            if(iqScale< -100.0f){
+                iqScale = -100.0f
+            }
+            iqScale *= 100.0f;
+            int16_t integer_iq = (int16_t)iqScale;
+            uint8_t sendbyte = ((integer_iq >> 8) & 0xFF);
+            scic_xmit(sendbyte); // high 8 bits
+            sendbyte = (integer_iq & 0xFF);
+            scic_xmit(sendbyte); // low 8 bits
+            break;
+        case 0x0A://transmit RPM
+            int16_t RPM_int = (int)Read.Read_RPM;
+            uint8_t sendbyte = ((RPM_int >> 8) & 0xFF);
+            scic_xmit(sendbyte); // high 8 bits
+            sendbyte = (RPM_int & 0xFF);
+            scic_xmit(sendbyte); // low 8 bits
+            break;
+        default:
+            break;
+    }
+}
 //
 // cpu_timer0_isr - CPU Timer0 ISR
 //

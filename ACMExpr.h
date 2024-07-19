@@ -15,8 +15,10 @@ struct IPC_MEMORY_READ{
     /* read only (RO) shared memory @ GS1 */
     REAL dac_buffer[8];
     REAL test;
-
-    // Ë«Ïò±äÁ¿
+    REAL Read_iq;
+    REAL Read_id;
+    REAL Read_RPM;
+    // Ë«ï¿½ï¿½ï¿½ï¿½ï¿½
 };
 struct IPC_MEMORY_WRITE{
     /* read/write (RW) shared memory @ GS0  owned by CPU2 */
@@ -30,7 +32,7 @@ struct IPC_MEMORY_WRITE{
     REAL speed_cmd_elec;
 
     int16 SCI_char;
-    // Ë«Ïò±äÁ¿
+    // Ë«ï¿½ï¿½ï¿½ï¿½ï¿½
 };
 
 extern struct IPC_MEMORY_WRITE Write;
