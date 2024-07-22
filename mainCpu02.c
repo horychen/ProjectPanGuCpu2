@@ -108,7 +108,7 @@ Uint32 sciBRxCount = 0;
 Uint32 sciARXErrCount = 0;
 Uint32 sciBRXErrCount = 0;
 
-// 注意，Eureka扩展板和测试板使用的WE信号管脚不同
+// 娉ㄦ剰锛孍ureka鎵╁睍鏉垮拰娴嬭瘯鏉夸娇鐢ㄧ殑WE淇″彿绠¤剼涓嶅悓
 #define EUREKA_BOARD
 
 #ifdef EUREKA_BOARD
@@ -127,7 +127,7 @@ void get_sciA_angle(){
     DELAY_US(2);
     SciaRegs.SCIFFRX.bit.RXFIFORESET = 1;
 
-    // 半双工模式
+    // 鍗婂弻宸ユā寮�
     ENCODER485_shank_WRITE_ENABLE
     scia_xmit(2);
     if(SciaRegs.SCIRXST.bit.RXERROR == 1){
@@ -146,7 +146,7 @@ void get_sciB_angle(){
     DELAY_US(2);
     ScibRegs.SCIFFRX.bit.RXFIFORESET = 1;
 
-    // 半双工模式
+    // 鍗婂弻宸ユā寮�
     ENCODER485_HIP_WRITE_ENABLE
     scib_xmit(2);
     if(ScibRegs.SCIRXST.bit.RXERROR == 1){
@@ -243,7 +243,7 @@ void Setup_CAN_Encoder(){
 
 }
 
-//声明全局变量
+//澹版槑鍏ㄥ眬鍙橀噺
 REAL CpuTimer_Delta_CPU02 = 0;
 Uint32 CpuTimer_Before_CPU02 = 0;
 Uint32 CpuTimer_After_CPU02 = 0;
@@ -273,7 +273,7 @@ void main(void){
     //
     // InitGpio();  // Skipped for this example
 
-    // 初始化SPI，用于与DAC芯片MAX5307通讯。
+    // 鍒濆鍖朣PI锛岀敤浜庝笌DAC鑺墖MAX5307閫氳銆�
     //GpioCtrlRegs.GPBMUX2.bit.GPIO57 = 0; // Configure GPIO57 as C\S\ signal for MAX5307
     InitSpi();
 
@@ -440,14 +440,14 @@ void main(void){
         //        DELAY_US(can01TxDelay);
         CANMessageGet(CANB_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
         can_pos_ID0x01 = (Uint32)(ucRXMsgData_ID0x01[5]*65536)+ (Uint32)(ucRXMsgData_ID0x01[4] * 256) + (Uint32)(ucRXMsgData_ID0x01[3]);
-        //        DELAY_US(can01RxDelay);   // 只要不加这句话，can03就会读数卡死？
+        //        DELAY_US(can01RxDelay);   // 鍙涓嶅姞杩欏彞璇濓紝can03灏变細璇绘暟鍗℃锛�
 
 
 
         //        DELAY_US(can03TxDelay);
         CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
         can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
-        //        DELAY_US(can03RxDelay);  // 只要加了这句话，can03就会读数为0？
+        //        DELAY_US(can03RxDelay);  // 鍙鍔犱簡杩欏彞璇濓紝can03灏变細璇绘暟涓�0锛�
 
         // tok2
         // tok2-tik2 = delta2 = 25328
@@ -700,7 +700,7 @@ interrupt void scibRxFifoIsr(void)
 {
     Uint16 i;
 
-    //这段放需要测时间的代码后面，观察CpuTimer_Delta_CPU02的取值，代表经过了多少个 1/200e6 秒。
+    //杩欐鏀鹃渶瑕佹祴鏃堕棿鐨勪唬鐮佸悗闈紝瑙傚療CpuTimer_Delta_CPU02鐨勫彇鍊硷紝浠ｈ〃缁忚繃浜嗗灏戜釜 1/200e6 绉掋��
     CpuTimer_After_CPU02 = CpuTimer1.RegsAddr->TIM.all; // get count
     CpuTimer_Delta_CPU02 = (REAL)CpuTimer_Before_CPU02 - (REAL)CpuTimer_After_CPU02;
     // EALLOW;
@@ -736,42 +736,46 @@ interrupt void scicRxFifoIsr(void)
 }
 
 void talk2PC(){
+    uint8_t sendbyte;
+    int16_t RPM_int = (int)Read.Read_RPM;
+    REAL idScale = Read.Read_id;
+    REAL iqScale = Read.Read_iq;
     if(!talk2PCFlag)return;
     talk2PCFlag = false;
     switch (SciCommandFromPC){
         case 0x02://transmit id
-            REAL idScale = Read.Read_id;
+
             if(idScale > 100.0f){
-                idScale = 100.0f
+                idScale = 100.0f;
             }      
             if(idScale< -100.0f){
-                idScale = -100.0f
+                idScale = -100.0f;
             }
             idScale *= 100.0f;
             int16_t integer_id = (int16_t)idScale;
-            uint8_t sendbyte = ((integer_id >> 8) & 0xFF);
+            sendbyte = ((integer_id >> 8) & 0xFF);
             scic_xmit(sendbyte); // high 8 bits
             sendbyte = (integer_id & 0xFF);
             scic_xmit(sendbyte); // low 8 bits
             break;
         case 0x05://transmit iq
-            REAL iqScale = Read.Read_iq;
+
             if(iqScale > 100.0f){
-                iqScale = 100.0f
+                iqScale = 100.0f;
             }      
             if(iqScale< -100.0f){
-                iqScale = -100.0f
+                iqScale = -100.0f;
             }
             iqScale *= 100.0f;
             int16_t integer_iq = (int16_t)iqScale;
-            uint8_t sendbyte = ((integer_iq >> 8) & 0xFF);
+            sendbyte = ((integer_iq >> 8) & 0xFF);
             scic_xmit(sendbyte); // high 8 bits
             sendbyte = (integer_iq & 0xFF);
             scic_xmit(sendbyte); // low 8 bits
             break;
         case 0x0A://transmit RPM
-            int16_t RPM_int = (int)Read.Read_RPM;
-            uint8_t sendbyte = ((RPM_int >> 8) & 0xFF);
+
+            sendbyte = ((RPM_int >> 8) & 0xFF);
             scic_xmit(sendbyte); // high 8 bits
             sendbyte = (RPM_int & 0xFF);
             scic_xmit(sendbyte); // low 8 bits
@@ -795,10 +799,10 @@ __interrupt void cpu_timer0_isr(void)
         Write.position_cmd_elec += 0.01;
         Write.speed_cmd_elec -= 0.01;
 
-        // 20240315之前的，sciA小腿，sciB大腿
+        // 20240315涔嬪墠鐨勶紝sciA灏忚吙锛宻ciB澶ц吙
         //      Write.SCI_shank_position_count = sciA_pos;
         //      Write.SCI_hip_position_count = sciB_pos;
-        // 20240315，调换小白板与uart1、uart2接口连线，sciA大腿，sciB小腿
+        // 20240315锛岃皟鎹㈠皬鐧芥澘涓巙art1銆乽art2鎺ュ彛杩炵嚎锛宻ciA澶ц吙锛宻ciB灏忚吙
         Write.SCI_shank_position_count = sciB_pos;
         Write.SCI_hip_position_count = sciA_pos;
         // Set a flag to notify CPU02 that data is available
@@ -812,7 +816,7 @@ __interrupt void cpu_timer0_isr(void)
     CANMessageSet(CANB_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
 
     // tik3
-    //这段放需要测时间的代码前面
+    //杩欐鏀鹃渶瑕佹祴鏃堕棿鐨勪唬鐮佸墠闈�
     EALLOW;
     CpuTimer1.RegsAddr->TCR.bit.TRB = 1; // reset cpu timer to period value
     CpuTimer1.RegsAddr->TCR.bit.TSS = 0; // start/restart
