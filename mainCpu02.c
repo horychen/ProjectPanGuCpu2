@@ -18,6 +18,7 @@ struct IPC_MEMORY_READ Read;
 #pragma DATA_SECTION(Write, "SHARERAMGS0"); // GS0 is write
 
 
+
 void MemCopy(Uint16 *SourceAddr, Uint16* SourceEndAddr, Uint16* DestAddr);
 void MemCopy(Uint16 *SourceAddr, Uint16* SourceEndAddr, Uint16* DestAddr)
 {
@@ -76,7 +77,7 @@ void scic_xmit(uint8_t a);
 unsigned char SciAReceivedChar[6];
 unsigned char SciBReceivedChar[6];
 
-unsigned char SciCommandFromPC;
+unsigned char SciCommandFromPC[3];
 bool talk2PCFlag = false;
 
 Uint32 sciA_pos;
@@ -387,6 +388,9 @@ void main(void){
     scia_echoback_init();  // Initialize SCI for echoback
     scib_fifo_init();      // Initialize the SCI FIFO
     scib_echoback_init();  // Initialize SCI for echoback
+    scic_fifo_init();      // Initialize the SCI FIFO
+    scic_echoback_init();  // Initialize SCI for echoback
+
     // Enable test mode and select external loopback
     //    HWREG(CANA_BASE + CAN_O_CTL) |= CAN_CTL_TEST;
     //    HWREG(CANA_BASE + CAN_O_TEST) = CAN_TEST_EXL;
@@ -404,7 +408,10 @@ void main(void){
     while(1)
     {
         mainWhileLoopCounter++;
-        talk2PC();
+        
+        // scic_xmit(5);
+        
+        
 
 
 
@@ -550,6 +557,8 @@ void scib_echoback_init()
 //    SciaRegs.SCIHBAUD.all =0x0000; //LSPCLK=100M
 //    SciaRegs.SCILBAUD.all =0x0018; //CLK=0.5M
 
+
+    //SCI Asynchronous Baud = LSPCLK / ((BRR + 1) *8)
     ScibRegs.SCIHBAUD.all =0x0000; //LSPCLK=100M
     ScibRegs.SCILBAUD.all =0x0004; //CLK=2.5M
 
@@ -569,6 +578,8 @@ void scic_echoback_init()
     ScicRegs.SCICTL1.all =0x0003;  // enable TX, RX, internal SCICLK,
                                    // Disable RX ERR, SLEEP, TXWAKE
     ScicRegs.SCICTL2.all =0x0003;
+    ScibRegs.SCICTL2.bit.TXINTENA =1;
+    ScibRegs.SCICTL2.bit.RXBKINTENA =1;
     // ScicRegs.SCICTL2.bit.TXINTENA =1; same to SCICTL2.all = 0x0003
     // ScicRegs.SCICTL2.bit.RXBKINTENA =1;
 
@@ -580,9 +591,10 @@ void scic_echoback_init()
 //    ScicRegs.SCILBAUD.all    =0x0063;
 //    ScicRegs.SCIHBAUD.all =0x0000; //LSPCLK=100M
 //    ScicRegs.SCILBAUD.all =0x0018; //CLK=0.5M
-
+    //SCI Asynchronous Baud = LSPCLK / ((BRR + 1) *8)
     ScicRegs.SCIHBAUD.all =0x0000; //LSPCLK=100M
-    ScicRegs.SCILBAUD.all =0x0004; //CLK=2.5M
+    ScicRegs.SCILBAUD.all =0x0009; //CLK=2.5M
+    //SCI Baud Rate = 1.25M
 
     ScicRegs.SCICTL1.all =0x0023;  // Relinquish SCI from Reset
 }
@@ -664,7 +676,7 @@ void scic_fifo_init()
 {
     ScicRegs.SCIFFTX.all=0xC040;
 
-    ScicRegs.SCIFFRX.all=0x2021; //1 word raise interrupt(receive command from pc)
+    ScicRegs.SCIFFRX.all=0x2023; //1 word raise interrupt(receive command from pc)
 
     ScicRegs.SCIFFCT.all=0x0;
 
@@ -727,58 +739,92 @@ interrupt void scicRxFifoIsr(void)
 {
     Uint16 i;
 
-    SciCommandFromPC =ScicRegs.SCIRXBUF.all & 0x00FF;  // Read data
-    talk2PCFlag = true;
+    SciCommandFromPC[0] =ScicRegs.SCIRXBUF.all & 0x00FF;  // Read data
+    SciCommandFromPC[1] =ScicRegs.SCIRXBUF.all & 0x00FF;  // Read data
+    SciCommandFromPC[2] =ScicRegs.SCIRXBUF.all & 0x00FF;  // Read data
+    cmd_fromPC2CPU();
     ScicRegs.SCIFFRX.bit.RXFFOVRCLR=1;   // Clear Overflow flag
     ScicRegs.SCIFFRX.bit.RXFFINTCLR=1;   // Clear Interrupt flag
 
     PieCtrlRegs.PIEACK.all |= PIEACK_GROUP8;       //Acknowledge PIE Interrupt Group 8
 }
 
-void talk2PC(){
-    if(!talk2PCFlag)return;
-    talk2PCFlag = false;
-    switch (SciCommandFromPC){
-        case 0x02://transmit id
-            REAL idScale = Read.Read_id;
-            if(idScale > 100.0f){
-                idScale = 100.0f
-            }      
-            if(idScale< -100.0f){
-                idScale = -100.0f
-            }
-            idScale *= 100.0f;
-            int16_t integer_id = (int16_t)idScale;
-            uint8_t sendbyte = ((integer_id >> 8) & 0xFF);
-            scic_xmit(sendbyte); // high 8 bits
-            sendbyte = (integer_id & 0xFF);
-            scic_xmit(sendbyte); // low 8 bits
-            break;
-        case 0x05://transmit iq
-            REAL iqScale = Read.Read_iq;
-            if(iqScale > 100.0f){
-                iqScale = 100.0f
-            }      
-            if(iqScale< -100.0f){
-                iqScale = -100.0f
-            }
-            iqScale *= 100.0f;
-            int16_t integer_iq = (int16_t)iqScale;
-            uint8_t sendbyte = ((integer_iq >> 8) & 0xFF);
-            scic_xmit(sendbyte); // high 8 bits
-            sendbyte = (integer_iq & 0xFF);
-            scic_xmit(sendbyte); // low 8 bits
-            break;
-        case 0x0A://transmit RPM
-            int16_t RPM_int = (int)Read.Read_RPM;
-            uint8_t sendbyte = ((RPM_int >> 8) & 0xFF);
-            scic_xmit(sendbyte); // high 8 bits
-            sendbyte = (RPM_int & 0xFF);
-            scic_xmit(sendbyte); // low 8 bits
-            break;
-        default:
-            break;
+void cmd_fromPC2CPU(){
+    if(SciCommandFromPC[0] != 0xC9){
+        
+        while(IPCLtoRFlagBusy(IPC_FLAG7) == 0){  // wait until not busy
+            Write.run_enable = false;
+            IPCLtoRFlagSet(IPC_FLAG7);
+        }
+        return;
     }
+    int32 integer_cmd = (int16_t)((SciCommandFromPC[1] << 8) + SciCommandFromPC[2]) - 8192;
+    if(integer_cmd > 5000)integer_cmd = 5000;
+    if(integer_cmd < -5000)integer_cmd = -5000;
+
+    if(IPCLtoRFlagBusy(IPC_FLAG7) == 0){  // if not busy
+        Write.run_enable = true;
+        IPCLtoRFlagSet(IPC_FLAG7);
+    }
+    if(IPCLtoRFlagBusy(IPC_FLAG8) == 0){  // if not busy
+        
+        Write.current_cmd_from_PC = (REAL)integer_cmd * 0.01;
+        IPCLtoRFlagSet(IPC_FLAG8);
+    }
+}
+void talk2PC(){
+    ScicRegs.SCIFFRX.bit.RXFIFORESET = 0;
+    DELAY_US(2);
+    ScicRegs.SCIFFRX.bit.RXFIFORESET = 1;
+    Uint16 RPM_FBK = (Read.Read_RPM * 10.0)+ 8192;
+    uint8_t sendbyte = ((RPM_FBK >> 8) & 0xFF);
+    scic_xmit(sendbyte); // high 8 bits
+    sendbyte = (RPM_FBK & 0xFF);
+    scic_xmit(sendbyte); // low 8 bits
+    return;
+    // if(!talk2PCFlag)return;
+    // talk2PCFlag = false;
+    // switch (SciCommandFromPC){
+    //     case 0x02://transmit id
+    //         REAL idScale = Read.Read_id;
+    //         if(idScale > 100.0f){
+    //             idScale = 100.0f
+    //         }      
+    //         if(idScale< -100.0f){
+    //             idScale = -100.0f
+    //         }
+    //         idScale *= 100.0f;
+    //         int16_t integer_id = (int16_t)idScale;
+    //         uint8_t sendbyte = ((integer_id >> 8) & 0xFF);
+    //         scic_xmit(sendbyte); // high 8 bits
+    //         sendbyte = (integer_id & 0xFF);
+    //         scic_xmit(sendbyte); // low 8 bits
+    //         break;
+    //     case 0x05://transmit iq
+    //         REAL iqScale = Read.Read_iq;
+    //         if(iqScale > 100.0f){
+    //             iqScale = 100.0f
+    //         }      
+    //         if(iqScale< -100.0f){
+    //             iqScale = -100.0f
+    //         }
+    //         iqScale *= 100.0f;
+    //         int16_t integer_iq = (int16_t)iqScale;
+    //         uint8_t sendbyte = ((integer_iq >> 8) & 0xFF);
+    //         scic_xmit(sendbyte); // high 8 bits
+    //         sendbyte = (integer_iq & 0xFF);
+    //         scic_xmit(sendbyte); // low 8 bits
+    //         break;
+    //     case 0x0A://transmit RPM
+    //         int16_t RPM_int = (int)Read.Read_RPM;
+    //         uint8_t sendbyte = ((RPM_int >> 8) & 0xFF);
+    //         scic_xmit(sendbyte); // high 8 bits
+    //         sendbyte = (RPM_int & 0xFF);
+    //         scic_xmit(sendbyte); // low 8 bits
+    //         break;
+    //     default:
+    //         break;
+    // }
 }
 //
 // cpu_timer0_isr - CPU Timer0 ISR
@@ -789,6 +835,15 @@ __interrupt void cpu_timer0_isr(void)
     CpuTimer0.InterruptCount++;
     GpioDataRegs.GPATOGGLE.bit.GPIO31 = 1;
     EDIS;
+    if(ScicRegs.SCIFFRX.bit.RXFFST != 0){
+        ScicRegs.SCIFFRX.bit.RXFIFORESET = 0;
+        DELAY_US(2);
+        ScicRegs.SCIFFRX.bit.RXFIFORESET = 1;
+    }
+    if(IPCRtoLFlagBusy(IPC_FLAG9) == 1){
+        talk2PC();
+        IPCRtoLFlagAcknowledge (IPC_FLAG9);
+    }
 
     if (IPCLtoRFlagBusy(IPC_FLAG10) == 0) // if not busy
     {
