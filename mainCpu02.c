@@ -835,11 +835,18 @@ __interrupt void cpu_timer0_isr(void)
     CpuTimer0.InterruptCount++;
     GpioDataRegs.GPATOGGLE.bit.GPIO31 = 1;
     EDIS;
-    if(ScicRegs.SCIFFRX.bit.RXFFST != 0){
-        ScicRegs.SCIFFRX.bit.RXFIFORESET = 0;
-        DELAY_US(2);
-        ScicRegs.SCIFFRX.bit.RXFIFORESET = 1;
+
+    if(ScicRegs.SCIRXST.bit.RXERROR == 1){
+        ScicRegs.SCICTL1.bit.SWRESET = 0;
     }
+    ScicRegs.SCICTL1.bit.SWRESET = 1;
+
+
+    // if(ScicRegs.SCIFFRX.bit.RXFFST != 0){
+    //     ScicRegs.SCIFFRX.bit.RXFIFORESET = 0;
+    //     DELAY_US(2);
+    //     ScicRegs.SCIFFRX.bit.RXFIFORESET = 1;
+    // }
     if(IPCRtoLFlagBusy(IPC_FLAG9) == 1){
         talk2PC();
         IPCRtoLFlagAcknowledge (IPC_FLAG9);
