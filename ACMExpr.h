@@ -20,6 +20,10 @@ struct IPC_MEMORY_READ{
 };
 struct IPC_MEMORY_WRITE{
     /* read/write (RW) shared memory @ GS0  owned by CPU2 */
+    Uint32 SCI_A_position_count;
+    Uint32 SCI_B_position_count;
+
+    //* [WuBo] shank and hip are mixed up with the sci_A and sci_B, makes me confused
     Uint32 SCI_shank_position_count;
     Uint32 CAN_position_count_ID0x03;
 

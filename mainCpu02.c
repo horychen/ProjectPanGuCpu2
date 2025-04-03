@@ -688,6 +688,8 @@ __interrupt void cpu_timer0_isr(void)
         // 20240315，调换小白板与uart1、uart2接口连线，sciA大腿，sciB小腿
         Write.SCI_shank_position_count = sciB_pos;
         Write.SCI_hip_position_count = sciA_pos;
+        Write.SCI_A_position_count = sciA_pos;
+        Write.SCI_B_position_count = sciB_pos;
         // Set a flag to notify CPU02 that data is available
         IPCLtoRFlagSet(IPC_FLAG10);
     }
