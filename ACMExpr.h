@@ -3,6 +3,7 @@
 #include "F28x_Project.h"
 #include "F2837xD_Ipc_drivers.h"
 #include "DAC_MAX5307.h"
+#include "ADS8688.h"
 
 
 
@@ -16,7 +17,7 @@ struct IPC_MEMORY_READ{
     REAL dac_buffer[8];
     REAL test;
 
-    // Ë«Ïò±äÁ¿
+    // Ë«ï¿½ï¿½ï¿½ï¿½ï¿½
 };
 struct IPC_MEMORY_WRITE{
     /* read/write (RW) shared memory @ GS0  owned by CPU2 */
@@ -32,9 +33,10 @@ struct IPC_MEMORY_WRITE{
 
     REAL position_cmd_elec;
     REAL speed_cmd_elec;
-
+    uint16_t adc_test_val;
+    uint16_t adc_raw;
     int16 SCI_char;
-    // Ë«Ïò±äÁ¿
+    // Ë«ï¿½ï¿½ï¿½ï¿½ï¿½
 };
 
 extern struct IPC_MEMORY_WRITE Write;

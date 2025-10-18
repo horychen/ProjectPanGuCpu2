@@ -278,6 +278,7 @@ void main(void){
 #ifdef _MOTOR_GROUP
     InitSpi4MAX5725();
 #endif
+    InitSpi4ADS8688();
 #endif
 
     //
@@ -335,7 +336,7 @@ void main(void){
     //         found in F2837xD_CpuTimers.c
     //
     InitCpuTimers();  
-
+    Write.adc_test_val = ADS8688_SmokeTest();
     //
     // Configure CPU-Timer0 to interrupt every second:
     ConfigCpuTimer(&CpuTimer0, 200, 100);    //
@@ -403,33 +404,31 @@ void main(void){
     {
         mainWhileLoopCounter++;
 
-
-
-
-
         // tik1
         if(IPCRtoLFlagBusy(IPC_FLAG7) == 1){
-#ifdef _LEG_GROUP
-            DAC_MAX5307(1, Read.dac_buffer[0] ); //71us 10khz
-            DAC_MAX5307(2, Read.dac_buffer[1] ); //71us 10khz
-            DAC_MAX5307(3, Read.dac_buffer[2] ); //71us 10khz
-            DAC_MAX5307(4, Read.dac_buffer[3] ); //71us 10khz
-            DAC_MAX5307(5, Read.dac_buffer[4] ); //71us 10khz
-            DAC_MAX5307(6, Read.dac_buffer[5] ); //71us 10khz
-            DAC_MAX5307(7, Read.dac_buffer[6] ); //71us 10khz
-            DAC_MAX5307(8, Read.dac_buffer[7] ); //71us 10khz
-#else
-#ifdef _MOTOR_GROUP
-            DAC_MAX5725(1, Read.dac_buffer[0] ); //71us 10khz
-            DAC_MAX5725(2, Read.dac_buffer[1] ); //71us 10khz
-            DAC_MAX5725(3, Read.dac_buffer[2] ); //71us 10khz
-            DAC_MAX5725(4, Read.dac_buffer[3] ); //71us 10khz
-            DAC_MAX5725(5, Read.dac_buffer[4] ); //71us 10khz
-            DAC_MAX5725(6, Read.dac_buffer[5] ); //71us 10khz
-            DAC_MAX5725(7, Read.dac_buffer[6] ); //71us 10khz
-            DAC_MAX5725(8, Read.dac_buffer[7] ); //71us 10khz
-#endif
-#endif
+            #ifdef _LEG_GROUP
+                        DAC_MAX5307(1, Read.dac_buffer[0] ); //71us 10khz
+                        DAC_MAX5307(2, Read.dac_buffer[1] ); //71us 10khz
+                        DAC_MAX5307(3, Read.dac_buffer[2] ); //71us 10khz
+                        DAC_MAX5307(4, Read.dac_buffer[3] ); //71us 10khz
+                        DAC_MAX5307(5, Read.dac_buffer[4] ); //71us 10khz
+                        DAC_MAX5307(6, Read.dac_buffer[5] ); //71us 10khz
+                        DAC_MAX5307(7, Read.dac_buffer[6] ); //71us 10khz
+                        DAC_MAX5307(8, Read.dac_buffer[7] ); //71us 10khz
+            #else
+            #ifdef _MOTOR_GROUP
+                        DAC_MAX5725(1, Read.dac_buffer[0] ); //71us 10khz
+                        DAC_MAX5725(2, Read.dac_buffer[1] ); //71us 10khz
+                        DAC_MAX5725(3, Read.dac_buffer[2] ); //71us 10khz
+                        DAC_MAX5725(4, Read.dac_buffer[3] ); //71us 10khz
+                        DAC_MAX5725(5, Read.dac_buffer[4] ); //71us 10khz
+                        DAC_MAX5725(6, Read.dac_buffer[5] ); //71us 10khz
+                        DAC_MAX5725(7, Read.dac_buffer[6] ); //71us 10khz
+                        DAC_MAX5725(8, Read.dac_buffer[7] ); //71us 10khz
+            #endif
+            #endif
+                // 简单轮询读取，放在你的while(1)循环里
+            Write.adc_raw = ADS8688_Frame32(0x0000);
             IPCRtoLFlagAcknowledge (IPC_FLAG7);
         }//tok1
         // delta1 = 2864 (when SPI_BRR = 6, spi_clk is 14.28MHz)
