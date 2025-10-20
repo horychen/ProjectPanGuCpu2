@@ -3,6 +3,7 @@
 #include "F28x_Project.h"
 #include "F2837xD_Ipc_drivers.h"
 #include "DAC_MAX5307.h"
+#include "ADS8688.h"
 
 
 
@@ -16,11 +17,15 @@ struct IPC_MEMORY_READ{
     REAL dac_buffer[8];
     REAL test;
 
-    // Ë«Ïò±äÁ¿
+    // Ë«ï¿½ï¿½ï¿½ï¿½ï¿½
 };
 struct IPC_MEMORY_WRITE{
     /* read/write (RW) shared memory @ GS0  owned by CPU2 */
-    Uint32 SCI_knee_position_count;
+    Uint32 SCI_A_position_count;
+    Uint32 SCI_B_position_count;
+
+    //* [WuBo] shank and hip are mixed up with the sci_A and sci_B, makes me confused
+    Uint32 SCI_shank_position_count;
     Uint32 CAN_position_count_ID0x03;
 
     Uint32 SCI_hip_position_count;
@@ -28,9 +33,10 @@ struct IPC_MEMORY_WRITE{
 
     REAL position_cmd_elec;
     REAL speed_cmd_elec;
-
+    int16_t adc_test_val;
+    int64_t adc_raw[8];
     int16 SCI_char;
-    // Ë«Ïò±äÁ¿
+    // Ë«ï¿½ï¿½ï¿½ï¿½ï¿½
 };
 
 extern struct IPC_MEMORY_WRITE Write;

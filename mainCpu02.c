@@ -17,7 +17,9 @@ struct IPC_MEMORY_READ Read;
 #pragma DATA_SECTION( Read, "SHARERAMGS1");
 #pragma DATA_SECTION(Write, "SHARERAMGS0"); // GS0 is write
 
-
+float testval=0.0;
+int hzq_debug=0;
+uint8_t r0 = 0;
 void MemCopy(Uint16 *SourceAddr, Uint16* SourceEndAddr, Uint16* DestAddr);
 void MemCopy(Uint16 *SourceAddr, Uint16* SourceEndAddr, Uint16* DestAddr)
 {
@@ -58,6 +60,8 @@ unsigned char ucTXMsgData_ID0x03[8], ucRXMsgData_ID0x03[8];
 #define RX_ID0x03_OBJID 4
 
 // Prototype statements for functions found within this file.
+
+__interrupt void cpu_timer0_isr(void);
 interrupt void sciaRxFifoIsr(void);
 void scia_echoback_init(void);
 void scia_fifo_init(void);
@@ -71,38 +75,51 @@ unsigned char SciBReceivedChar[6];
 Uint32 sciA_pos;
 Uint32 sciB_pos;
 Uint32 can_pos_ID0x01;
-Uint32 can_pos_ID0x03; // knee joint encoder
+Uint32 can_pos_ID0x03; // shank joint encoder
 Uint32 can_pos_prev;
 
 Uint32 can_used;
 Uint32 sci_used;
 
-REAL dataStoreCan[2000];
-REAL dataStoreSci[2000];
+//REAL dataStoreCan[2000];
+//REAL dataStoreSci[2000];
 
 int32 deltaPos;
 int16 dataWidth = 10;
 Uint16 startRecode = 0;
 int16 dataIndex = 0;
 
-int sciaTxCount = 0;
-int sciaRxCount = 0;
-int scibTxCount = 0;
-int scibRxCount = 0;
+//int can01TxDelay = 15;
+//int can01RxDelay = 15;
+//int can03TxDelay = 18;
+//int can03RxDelay = 20;
+
+Uint32 sciATxCount = 0;
+Uint32 sciARxCount = 0;
+Uint32 sciBTxCount = 0;
+Uint32 sciBRxCount = 0;
+Uint32 sciARXErrCount = 0;
+Uint32 sciBRXErrCount = 0;
 
 // 注意，Eureka扩展板和测试板使用的WE信号管脚不同
 #define EUREKA_BOARD
 
-#ifdef EUREKA_BOARD
-#define ENCODER485_KNEE_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO139 = 1;
-#define ENCODER485_KNEE_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO139 = 1;
-#define ENCODER485_HIP_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO140 = 1;
-#define ENCODER485_HIP_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO140 = 1;
+#ifdef _LEG_GROUP
+    #define ENCODER485_shank_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO139 = 1;
+    #define ENCODER485_shank_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO139 = 1;
+    #define ENCODER485_HIP_WRITE_ENABLE  GpioDataRegs.GPESET.bit.GPIO140 = 1;
+    #define ENCODER485_HIP_WRITE_DISABLE  GpioDataRegs.GPECLEAR.bit.GPIO140 = 1;
 #else
-#define ENCODER485_KNEE_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO8 = 1;
-#define ENCODER485_KNEE_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO8 = 1;
+    #ifdef _MOTOR_GROUP
+        #define ENCODER485_shank_WRITE_ENABLE  GpioDataRegs.GPBSET.bit.GPIO37 = 1;
+        #define ENCODER485_shank_WRITE_DISABLE  GpioDataRegs.GPBCLEAR.bit.GPIO37 = 1;
+        #define ENCODER485_HIP_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO31 = 1;
+        #define ENCODER485_HIP_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO31 = 1;
+    #else
+        #define ENCODER485_shank_WRITE_ENABLE  GpioDataRegs.GPASET.bit.GPIO8 = 1;
+        #define ENCODER485_shank_WRITE_DISABLE  GpioDataRegs.GPACLEAR.bit.GPIO8 = 1;
+    #endif
 #endif
-
 void get_sciA_angle(){
 
     SciaRegs.SCIFFRX.bit.RXFIFORESET = 0;
@@ -110,11 +127,16 @@ void get_sciA_angle(){
     SciaRegs.SCIFFRX.bit.RXFIFORESET = 1;
 
     // 半双工模式
-    ENCODER485_KNEE_WRITE_ENABLE
+    ENCODER485_shank_WRITE_ENABLE
     scia_xmit(2);
-    sciaTxCount++;
+    if(SciaRegs.SCIRXST.bit.RXERROR == 1){
+        SciaRegs.SCICTL1.bit.SWRESET = 0;
+        sciARXErrCount ++;
+    }
     DELAY_US(5);
-    ENCODER485_KNEE_WRITE_DISABLE
+    SciaRegs.SCICTL1.bit.SWRESET = 1;//SW RESET disable
+    sciATxCount++;
+    ENCODER485_shank_WRITE_DISABLE
 }
 
 void get_sciB_angle(){
@@ -126,45 +148,21 @@ void get_sciB_angle(){
     // 半双工模式
     ENCODER485_HIP_WRITE_ENABLE
     scib_xmit(2);
-    scibTxCount++;
+    if(ScibRegs.SCIRXST.bit.RXERROR == 1){
+        ScibRegs.SCICTL1.bit.SWRESET = 0;
+        sciBRXErrCount ++;
+    }
     DELAY_US(5);
+    ScibRegs.SCICTL1.bit.SWRESET = 1;//SW RESET disable
+    sciBTxCount++;
     ENCODER485_HIP_WRITE_DISABLE
 }
 
-//
-// Main
-//
-void main(void)
-{
+
+Uint64 mainWhileLoopCounter = 0;
 
 
-    //
-    // Wait until Shared RAM is available.
-    //
-    while(!( MemCfgRegs.GSxMSEL.bit.MSEL_GS0))
-    {
-    }
-    START_LED1
-
-    //
-    // Step 1. Initialize System Control:
-    // PLL, WatchDog, enable Peripheral Clocks
-    // This example function is found in the F2837xD_SysCtrl.c file.
-    //
-    InitSysCtrl();
-
-    //
-    // Step 2. Initialize GPIO:
-    // This example function is found in the F2837xD_Gpio.c file and
-    // illustrates how to set the GPIO to it's default state.
-    //
-    // InitGpio();  // Skipped for this example
-
-    // 初始化SPI，用于与DAC芯片MAX5307通讯。
-    //GpioCtrlRegs.GPBMUX2.bit.GPIO57 = 0; // Configure GPIO57 as C\S\ signal for MAX5307
-    InitSpi();
-
-
+void Setup_CAN_Encoder(){
 
     // Initialize the CAN controller
     CANInit(CANA_BASE);
@@ -189,6 +187,101 @@ void main(void)
     CANBitRateSet(CANA_BASE, 200000000, 500000);
     CANBitRateSet(CANB_BASE, 200000000, 500000);
 
+
+    // Enable the CAN for operation.
+    CANEnable(CANA_BASE);
+    CANEnable(CANB_BASE);
+
+    // Initialize the message object that will be used for sending CAN
+    // messages.
+    sTXCANMessage_ID0x01.ui32MsgID = 1;                     // CAN message ID - use 1
+    sTXCANMessage_ID0x01.ui32MsgIDMask = 0;                 // no mask needed for TX
+    sTXCANMessage_ID0x01.ui32Flags = MSG_OBJ_NO_FLAGS; // enable interrupt on TX
+    sTXCANMessage_ID0x01.ui32MsgLen = 3;                    // size of message is
+    ucTXMsgData_ID0x01[0] = sTXCANMessage_ID0x01.ui32MsgLen;
+    ucTXMsgData_ID0x01[1] = sTXCANMessage_ID0x01.ui32MsgID;
+    ucTXMsgData_ID0x01[2] = 1;
+    sTXCANMessage_ID0x01.pucMsgData = ucTXMsgData_ID0x01; // ptr to message content
+
+    // Initialize the message object that will be used for recieving CAN
+    // messages.
+    *(unsigned long *)ucRXMsgData_ID0x01 = 0;
+    sRXCANMessage_ID0x01.ui32MsgID = 1;                           // CAN message ID - use 1
+    sRXCANMessage_ID0x01.ui32MsgIDMask = 1;                       // no mask needed for TX
+    sRXCANMessage_ID0x01.ui32Flags = MSG_OBJ_USE_ID_FILTER;            //
+    sRXCANMessage_ID0x01.ui32MsgLen = sizeof(ucRXMsgData_ID0x01); // size of message is 4
+    sRXCANMessage_ID0x01.pucMsgData = ucRXMsgData_ID0x01;         // ptr to message content
+
+    // Initialize the message object that will be used for sending CAN
+    // messages.
+    sTXCANMessage_ID0x03.ui32MsgID = 3;                     // CAN message ID - use 3
+    sTXCANMessage_ID0x03.ui32MsgIDMask = 0;                 // no mask needed for TX
+    sTXCANMessage_ID0x03.ui32Flags = MSG_OBJ_NO_FLAGS; // enable interrupt on TX
+    sTXCANMessage_ID0x03.ui32MsgLen = 3;                    // size of message is
+    ucTXMsgData_ID0x03[0] = sTXCANMessage_ID0x03.ui32MsgLen;
+    ucTXMsgData_ID0x03[1] = sTXCANMessage_ID0x03.ui32MsgID;
+    ucTXMsgData_ID0x03[2] = 1;
+    sTXCANMessage_ID0x03.pucMsgData = ucTXMsgData_ID0x03; // ptr to message content
+
+    // Initialize the message object that will be used for recieving CAN
+    // messages.
+    *(unsigned long *)ucRXMsgData_ID0x03 = 0;
+    sRXCANMessage_ID0x03.ui32MsgID = 3;                        // CAN message ID - use 3
+    sRXCANMessage_ID0x03.ui32MsgIDMask = 3;                   // no mask needed for TX
+    sRXCANMessage_ID0x03.ui32Flags = MSG_OBJ_USE_ID_FILTER;        //
+    sRXCANMessage_ID0x03.ui32MsgLen = sizeof(ucRXMsgData_ID0x03); // size of message is 4
+    sRXCANMessage_ID0x03.pucMsgData = ucRXMsgData_ID0x03;        // ptr to message content
+
+    // Enter loop to send messages.  A new message will be sent once per
+    // second.  The 4 bytes of message content will be treated as an unsigned
+    // long and incremented by one each time.
+
+    // Setup the message object being used to receive messages
+    CANMessageSet(CANB_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, MSG_OBJ_TYPE_RX);
+    CANMessageSet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, MSG_OBJ_TYPE_RX);
+
+}
+
+//声明全局变量
+REAL CpuTimer_Delta_CPU02 = 0;
+Uint32 CpuTimer_Before_CPU02 = 0;
+Uint32 CpuTimer_After_CPU02 = 0;
+
+//
+// Main
+//
+void main(void){
+    //
+    // Wait until Shared RAM is available.
+    //
+    while(!( MemCfgRegs.GSxMSEL.bit.MSEL_GS0))
+    {
+    }
+
+    //
+    // Step 1. Initialize System Control:
+    // PLL, WatchDog, enable Peripheral Clocks
+    // This example function is found in the F2837xD_SysCtrl.c file.
+    //
+    InitSysCtrl();
+
+    //
+    // Step 2. Initialize GPIO:
+    // This example function is found in the F2837xD_Gpio.c file and
+    // illustrates how to set the GPIO to it's default state.
+    //
+    // InitGpio();  // Skipped for this example
+
+    // 初始化SPI，用于与DAC芯片MAX5307通讯。
+    //GpioCtrlRegs.GPBMUX2.bit.GPIO57 = 0; // Configure GPIO57 as C\S\ signal for MAX5307
+#ifdef _LEG_GROUP
+    InitSpi4MAX5307();
+#else
+#ifdef _MOTOR_GROUP
+    InitSpi4MAX5725();
+#endif
+    InitSpi4ADS8688();
+#endif
 
     //
     // Step 3. Clear all interrupts and initialize PIE vector table:
@@ -235,7 +328,7 @@ void main(void)
     // ISR functions found within this file.
     //
     EALLOW;  // This is needed to write to EALLOW protected registers
-    //PieVectTable.TIMER0_INT = &cpu_timer0_isr;
+    PieVectTable.TIMER0_INT = &cpu_timer0_isr;
     PieVectTable.SCIA_RX_INT = &sciaRxFifoIsr;
     PieVectTable.SCIB_RX_INT = &scibRxFifoIsr;
     EDIS;    // This is needed to disable write to EALLOW protected registers
@@ -244,19 +337,18 @@ void main(void)
     // Step 4. Initialize the Device Peripheral. This function can be
     //         found in F2837xD_CpuTimers.c
     //
-    //InitCpuTimers();   // For this example, only initialize the Cpu Timers
-
+    InitCpuTimers();  
+    Write.adc_test_val = ADS8688_SmokeTest();
     //
     // Configure CPU-Timer0 to interrupt every second:
-    // c2_FREQ in MHz, 1 second Period (in uSeconds)
-    //
-    //ConfigCpuTimer(&CpuTimer0, 200, 1000000);
+    ConfigCpuTimer(&CpuTimer0, 200, 100);    //
+    ConfigCpuTimer(&CpuTimer1, 200, 1000000);
 
     //
     // To ensure precise timing, use write-only instructions to write to the
     // entire register.
     //
-    //CpuTimer0Regs.TCR.all = 0x4000;
+    CpuTimer0Regs.TCR.all = 0x4000;
 
     //
     // Step 5. User specific code, enable interrupts:
@@ -270,23 +362,25 @@ void main(void)
     //
     // Enable TINT0 in the PIE: Group 1 interrupt 7
     //
-    //PieCtrlRegs.PIEIER1.bit.INTx7 = 1;
 
     PieCtrlRegs.PIECTRL.bit.ENPIE = 1;   // Enable the PIE block
+    PieCtrlRegs.PIEIER1.bit.INTx7 = 1;   // Enable TINT0 in the PIE: Group 1 interrupt 7
     PieCtrlRegs.PIEIER9.bit.INTx1 = 1;   // PIE Group 9, INT1 SCIA receive
     PieCtrlRegs.PIEIER9.bit.INTx3 = 1;   // PIE Group 9, INT1 SCIB receive
-    IER = 0x100;                         // Enable CPU INT
+
+    IER |= M_INT1; // CPU-Timer 0
+    IER |= M_INT9; // SCI Rx                       // Enable CPU INT
     //
     // Enable global Interrupts and higher priority real-time debug events:
     //
     EINT;   // Enable Global interrupt INTM
     ERTM;   // Enable Global realtime interrupt DBGM
 
-    Write.position_cmd_elec = 100;
-    Write.speed_cmd_elec = 600;
-    IPCLtoRFlagSet(IPC_FLAG10);
+    // Write.position_cmd_elec = 100;
+    // Write.speed_cmd_elec = 600;
+    // IPCLtoRFlagSet(IPC_FLAG10);
 
-    START_LED2
+    // START_LED2
 
 
 
@@ -295,149 +389,90 @@ void main(void)
     scib_fifo_init();      // Initialize the SCI FIFO
     scib_echoback_init();  // Initialize SCI for echoback
     // Enable test mode and select external loopback
-//    HWREG(CANA_BASE + CAN_O_CTL) |= CAN_CTL_TEST;
-//    HWREG(CANA_BASE + CAN_O_TEST) = CAN_TEST_EXL;
+    //    HWREG(CANA_BASE + CAN_O_CTL) |= CAN_CTL_TEST;
+    //    HWREG(CANA_BASE + CAN_O_TEST) = CAN_TEST_EXL;
+    Setup_CAN_Encoder();
 
-    // Enable the CAN for operation.
-    CANEnable(CANA_BASE);
-    CANEnable(CANB_BASE);
-
-    // Initialize the message object that will be used for sending CAN
-    // messages.
-    sTXCANMessage_ID0x01.ui32MsgID = 1;                        // CAN message ID - use 1
-    sTXCANMessage_ID0x01.ui32MsgIDMask = 0;                    // no mask needed for TX
-    sTXCANMessage_ID0x01.ui32Flags = MSG_OBJ_TX_INT_ENABLE;    // enable interrupt on TX
-    sTXCANMessage_ID0x01.ui32MsgLen = 3;     // size of message is
-    ucTXMsgData_ID0x01[0] = sTXCANMessage_ID0x01.ui32MsgLen;
-    ucTXMsgData_ID0x01[1] = sTXCANMessage_ID0x01.ui32MsgID;
-    ucTXMsgData_ID0x01[2] = 1;
-    sTXCANMessage_ID0x01.pucMsgData = ucTXMsgData_ID0x01;           // ptr to message content
-
-    // Initialize the message object that will be used for recieving CAN
-    // messages.
-    *(unsigned long *)ucRXMsgData_ID0x01 = 0;
-    sRXCANMessage_ID0x01.ui32MsgID = 1;                        // CAN message ID - use 1
-    sRXCANMessage_ID0x01.ui32MsgIDMask = 0;                    // no mask needed for TX
-    sRXCANMessage_ID0x01.ui32Flags = MSG_OBJ_NO_FLAGS;         //
-    sRXCANMessage_ID0x01.ui32MsgLen = sizeof(ucRXMsgData_ID0x01);     // size of message is 4
-    sRXCANMessage_ID0x01.pucMsgData = ucRXMsgData_ID0x01;           // ptr to message content
-
-    // Initialize the message object that will be used for sending CAN
-    // messages.
-    sTXCANMessage_ID0x03.ui32MsgID = 3;                        // CAN message ID - use 3
-    sTXCANMessage_ID0x03.ui32MsgIDMask = 0;                    // no mask needed for TX
-    sTXCANMessage_ID0x03.ui32Flags = MSG_OBJ_TX_INT_ENABLE;    // enable interrupt on TX
-    sTXCANMessage_ID0x03.ui32MsgLen = 0x03;     // size of message is
-    ucTXMsgData_ID0x03[0] = sTXCANMessage_ID0x03.ui32MsgLen;
-    ucTXMsgData_ID0x03[1] = sTXCANMessage_ID0x03.ui32MsgID;
-    ucTXMsgData_ID0x03[2] = 0x01;
-    sTXCANMessage_ID0x03.pucMsgData = ucTXMsgData_ID0x03;           // ptr to message content
-
-    // Initialize the message object that will be used for recieving CAN
-    // messages.
-    *(unsigned long *)ucRXMsgData_ID0x03 = 0;
-    sRXCANMessage_ID0x03.ui32MsgID = 3;                        // CAN message ID - use 3
-    sRXCANMessage_ID0x03.ui32MsgIDMask = 0;                    // no mask needed for TX
-    sRXCANMessage_ID0x03.ui32Flags = MSG_OBJ_NO_FLAGS;         //
-    sRXCANMessage_ID0x03.ui32MsgLen = sizeof(ucRXMsgData_ID0x03);     // size of message is 4
-    sRXCANMessage_ID0x03.pucMsgData = ucRXMsgData_ID0x03;           // ptr to message content
-
-    // Enter loop to send messages.  A new message will be sent once per
-    // second.  The 4 bytes of message content will be treated as an unsigned
-    // long and incremented by one each time.
-
-    // Setup the message object being used to receive messages
-    CANMessageSet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, MSG_OBJ_TYPE_RX);
-    CANMessageSet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, MSG_OBJ_TYPE_RX);
-
-    int i;
-    for(i=0;i<2000;i++)
-    {
-        dataStoreCan[i] = 0;
-        dataStoreSci[i] = 0;
-    }
-
+    ADS8688_SendCmd(ADS_CMD_RST, 0x00);
+    DELAY_US(10000);
+    (void)ADS8688_Frame32(0x0000);
 
     while(1)
     {
+        mainWhileLoopCounter++;
+
+        // tik1
         if(IPCRtoLFlagBusy(IPC_FLAG7) == 1){
-
-            DAC_MAX5307(1, Read.dac_buffer[0] ); //71us 10khz
-            DAC_MAX5307(2, Read.dac_buffer[1] ); //71us 10khz
-            DAC_MAX5307(3, Read.dac_buffer[2] ); //71us 10khz
-            DAC_MAX5307(4, Read.dac_buffer[3] ); //71us 10khz
-            //            DAC_MAX5307(5, Read.dac_buffer[4] ); //71us 10khz
-            //            DAC_MAX5307(6, Read.dac_buffer[5] ); //71us 10khz
-            //            DAC_MAX5307(7, Read.dac_buffer[6] ); //71us 10khz
-            //            DAC_MAX5307(8, Read.dac_buffer[7] ); //71us 10khz
-
+            #ifdef _LEG_GROUP
+                        DAC_MAX5307(1, Read.dac_buffer[0] ); //71us 10khz
+                        DAC_MAX5307(2, Read.dac_buffer[1] ); //71us 10khz
+                        DAC_MAX5307(3, Read.dac_buffer[2] ); //71us 10khz
+                        DAC_MAX5307(4, Read.dac_buffer[3] ); //71us 10khz
+                        DAC_MAX5307(5, Read.dac_buffer[4] ); //71us 10khz
+                        DAC_MAX5307(6, Read.dac_buffer[5] ); //71us 10khz
+                        DAC_MAX5307(7, Read.dac_buffer[6] ); //71us 10khz
+                        DAC_MAX5307(8, Read.dac_buffer[7] ); //71us 10khz
+            #else
+            #ifdef _MOTOR_GROUP
+                        DAC_MAX5725(1, Read.dac_buffer[0] ); //71us 10khz
+                        DAC_MAX5725(2, Read.dac_buffer[1] ); //71us 10khz
+                        DAC_MAX5725(3, Read.dac_buffer[2] ); //71us 10khz
+                        DAC_MAX5725(4, Read.dac_buffer[3] ); //71us 10khz
+                        DAC_MAX5725(5, Read.dac_buffer[4] ); //71us 10khz
+                        DAC_MAX5725(6, Read.dac_buffer[5] ); //71us 10khz
+                        DAC_MAX5725(7, Read.dac_buffer[6] ); //71us 10khz
+//                        DAC_MAX5725(8, Read.dac_buffer[7] ); //71us 10khz
+            #endif
+            #endif
+                // 简单轮询读取，放在你的while(1)循环里
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_0 << 8));
+            Write.adc_raw[0] = ADS8688_Frame32(0x0000);
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_1 << 8));
+            Write.adc_raw[1] = ADS8688_Frame32(0x0000);
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_2 << 8));
+            Write.adc_raw[2] = ADS8688_Frame32(0x0000);
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_3 << 8));
+            Write.adc_raw[3] = ADS8688_Frame32(0x0000);
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_4 << 8));
+            Write.adc_raw[4] = ADS8688_Frame32(0x0000);
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_5 << 8));
+            Write.adc_raw[5] = ADS8688_Frame32(0x0000);
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_6 << 8));
+            Write.adc_raw[6] = ADS8688_Frame32(0x0000);
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_7 << 8));
+            Write.adc_raw[7] = ADS8688_Frame32(0x0000);
+            testval = Write.adc_raw[hzq_debug] * 3.052316708e-5 -1;
+            DAC_MAX5725(8, testval);
             IPCRtoLFlagAcknowledge (IPC_FLAG7);
-        }
+        }//tok1
+        // delta1 = 2864 (when SPI_BRR = 6, spi_clk is 14.28MHz)
+        // delta1 = 3744 (when SPI_BRR = 9, spi_clk is 10MHz)
 
-        if(IPCLtoRFlagBusy(IPC_FLAG10) == 0) // if not busy
+
+        if(IPCLtoRFlagBusy(IPC_FLAG11) == 0) // if not busy
         {
-            Write.position_cmd_elec += 0.01;
-            Write.speed_cmd_elec -= 0.01;
-
-            Write.SCI_knee_position_count = sciA_pos;
-            Write.SCI_hip_position_count  = sciB_pos;
             Write.CAN_position_count_ID0x01 = can_pos_ID0x01;
             Write.CAN_position_count_ID0x03 = can_pos_ID0x03;
             // Set a flag to notify CPU02 that data is available
-            IPCLtoRFlagSet(IPC_FLAG10);
+            IPCLtoRFlagSet(IPC_FLAG11);
         }
 
-        CANMessageSet(CANA_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
-        DELAY_US(5);
-        CANMessageGet(CANA_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
-        can_pos_ID0x01 = (Uint32)(ucRXMsgData_ID0x01[5]*65536)+ (Uint32)(ucRXMsgData_ID0x01[4] * 256) + (Uint32)(ucRXMsgData_ID0x01[3]);
-        DELAY_US(30);
+        // tik2
 
-        CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
-        DELAY_US(5);
+        //        DELAY_US(can01TxDelay);
+        CANMessageGet(CANB_BASE, RX_ID0x01_OBJID, &sRXCANMessage_ID0x01, true);
+        can_pos_ID0x01 = (Uint32)(ucRXMsgData_ID0x01[5]*65536)+ (Uint32)(ucRXMsgData_ID0x01[4] * 256) + (Uint32)(ucRXMsgData_ID0x01[3]);
+        //        DELAY_US(can01RxDelay);   // 只要不加这句话，can03就会读数卡死？
+
+
+
+        //        DELAY_US(can03TxDelay);
         CANMessageGet(CANA_BASE, RX_ID0x03_OBJID, &sRXCANMessage_ID0x03, true);
         can_pos_ID0x03 = (Uint32)(ucRXMsgData_ID0x03[5]*65536)+ (Uint32)(ucRXMsgData_ID0x03[4] * 256) + (Uint32)(ucRXMsgData_ID0x03[3]);
-        DELAY_US(30);
+        //        DELAY_US(can03RxDelay);  // 只要加了这句话，can03就会读数为0？
 
-        get_sciA_angle();
-        get_sciB_angle();
-                // hip
-//                can_used = can_pos_ID0x01;
-//                sci_used = sciB_pos;
-        //        // knee
-//                can_used = can_pos_ID0x03;
-//                sci_used = sciA_pos;
-//
-//                deltaPos = (int32)(can_used - can_pos_prev);
-//                if(deltaPos < -65536)
-//                {
-//                    deltaPos += 131072;
-//                }
-//                if(deltaPos > 65536)
-//                {
-//                    deltaPos -= 131072;
-//                }
-//                if( deltaPos < (-1)*dataWidth){
-//                    dataIndex++;
-//                    startRecode = 1;
-//                }else if( deltaPos > dataWidth){
-//                    dataIndex--;
-//                    startRecode = 1;
-//                }
-//
-//                if(dataIndex>=2000){
-//                    dataIndex = 1999;
-//                }else if (dataIndex<0){
-//                    dataIndex = 0;
-//                }
-//
-//                if(startRecode == 1)
-//                {
-//                    can_pos_prev = can_used;
-//                    dataStoreCan[dataIndex] = (REAL)(can_used/131072.0*360.0);
-//                    dataStoreSci[dataIndex] = (REAL)(sci_used/8388608.0*360.0);
-//                    startRecode = 0;
-//                }
+        // tok2
+        // tok2-tik2 = delta2 = 25328
 
     }
 }
@@ -570,7 +605,7 @@ interrupt void sciaRxFifoIsr(void)
     }
     sciA_pos = (Uint32)(SciAReceivedChar[4] *65536) + (Uint32)(SciAReceivedChar[3] *256) + (Uint32)(SciAReceivedChar[2]);
 
-    sciaRxCount++;
+    sciARxCount++;
 
     SciaRegs.SCIFFRX.bit.RXFFOVRCLR=1;   // Clear Overflow flag
     SciaRegs.SCIFFRX.bit.RXFFINTCLR=1;   // Clear Interrupt flag
@@ -584,14 +619,22 @@ interrupt void scibRxFifoIsr(void)
 {
     Uint16 i;
 
+    //这段放需要测时间的代码后面，观察CpuTimer_Delta_CPU02的取值，代表经过了多少个 1/200e6 秒。
+    CpuTimer_After_CPU02 = CpuTimer1.RegsAddr->TIM.all; // get count
+    CpuTimer_Delta_CPU02 = (REAL)CpuTimer_Before_CPU02 - (REAL)CpuTimer_After_CPU02;
+    // EALLOW;
+    // CpuTimer1.RegsAddr->TCR.bit.TSS = 1; // stop (not needed because of the line TRB=1)
+    // EDIS;
+
+    //tok3
+    // tok3 -tik3 = 5400
     for(i=0;i<6;i++)
     {
        SciBReceivedChar[i]=ScibRegs.SCIRXBUF.all & 0x00FF;  // Read data
     }
     sciB_pos = (Uint32)(SciBReceivedChar[4] *65536) + (Uint32)(SciBReceivedChar[3] *256) + (Uint32)(SciBReceivedChar[2]);
 
-    scibRxCount++;
-
+    sciBRxCount++;
     ScibRegs.SCIFFRX.bit.RXFFOVRCLR=1;   // Clear Overflow flag
     ScibRegs.SCIFFRX.bit.RXFFINTCLR=1;   // Clear Interrupt flag
 
@@ -601,15 +644,46 @@ interrupt void scibRxFifoIsr(void)
 //
 // cpu_timer0_isr - CPU Timer0 ISR
 //
-//__interrupt void cpu_timer0_isr(void)
-//{
-//   EALLOW;
-//   CpuTimer0.InterruptCount++;
-//   GpioDataRegs.GPATOGGLE.bit.GPIO31 = 1;
-//   EDIS;
-//
-//   PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
-//}
+__interrupt void cpu_timer0_isr(void)
+{
+    EALLOW;
+    CpuTimer0.InterruptCount++;
+    // GpioDataRegs.GPATOGGLE.bit.GPIO31 = 1;
+    EDIS;
+
+    if (IPCLtoRFlagBusy(IPC_FLAG10) == 0) // if not busy
+    {
+        Write.position_cmd_elec += 0.01;
+        Write.speed_cmd_elec -= 0.01;
+
+        // 20240315之前的，sciA小腿，sciB大腿
+        //      Write.SCI_shank_position_count = sciA_pos;
+        //      Write.SCI_hip_position_count = sciB_pos;
+        // 20240315，调换小白板与uart1、uart2接口连线，sciA大腿，sciB小腿
+        Write.SCI_shank_position_count = sciB_pos;
+        Write.SCI_hip_position_count = sciA_pos;
+        Write.SCI_A_position_count = sciA_pos;
+        Write.SCI_B_position_count = sciB_pos;
+        // Set a flag to notify CPU02 that data is available
+        IPCLtoRFlagSet(IPC_FLAG10);
+    }
+
+    get_sciA_angle();
+    get_sciB_angle();
+
+    CANMessageSet(CANA_BASE, TX_ID0x03_OBJID, &sTXCANMessage_ID0x03, MSG_OBJ_TYPE_TX);
+    CANMessageSet(CANB_BASE, TX_ID0x01_OBJID, &sTXCANMessage_ID0x01, MSG_OBJ_TYPE_TX);
+
+    // tik3
+    //这段放需要测时间的代码前面
+    EALLOW;
+    CpuTimer1.RegsAddr->TCR.bit.TRB = 1; // reset cpu timer to period value
+    CpuTimer1.RegsAddr->TCR.bit.TSS = 0; // start/restart
+    CpuTimer_Before_CPU02 = CpuTimer1.RegsAddr->TIM.all; // get count
+    EDIS;
+
+    PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
+}
 
 //
 // End of file

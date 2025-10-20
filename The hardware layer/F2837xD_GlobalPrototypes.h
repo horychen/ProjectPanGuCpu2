@@ -53,6 +53,8 @@ extern void DisablePeripheralClocks(void);
 extern void InitPieCtrl(void);
 extern void InitPieVectTable(void);
 extern void InitSpi(void);
+extern void InitSpi4MAX5725(void);
+extern void InitSpi4MAX5307(void);
 extern void InitSpiGpio(void);
 extern void InitSpiaGpio(void);
 extern void InitSysCtrl(void);
