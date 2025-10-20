@@ -14,20 +14,6 @@
 #include <stdbool.h>
 #include "hw_types.h"   /* TI device header: provides SpiaRegs, GpioCtrlRegs, etc. */
 
-/* ---------------- User-configurable ---------------- */
-#ifndef ADS8688_MIN_LSPCLK_HZ
-#define ADS8688_MIN_LSPCLK_HZ   (50000000UL) /* Set to your LSPCLK */
-#endif
-
-#ifndef ADS8688_MIN_SPI_BAUD_HZ
-#define ADS8688_MIN_SPI_BAUD_HZ (5000000UL)  /* Start at 5 MHz */
-#endif
-
-/* Chip Select pin: default GPIO60 (Port B) */
-#ifndef ADS8688_MIN_CS_GPIO
-#define ADS8688_MIN_CS_GPIO     (60U)
-#endif
-
 /* CS control macros (GPIO60 default). If you change CS pin, edit below.) */
 #define ADS8688_MIN_CS_LOW()    (GpioDataRegs.GPBCLEAR.bit.GPIO61 = 1)
 #define ADS8688_MIN_CS_HIGH()   (GpioDataRegs.GPBSET.bit.GPIO61   = 1)
@@ -59,7 +45,7 @@
 #define ADS_REG_CH6_RANGE        0x0B
 #define ADS_REG_CH7_RANGE        0x0C
 #define ADS_REG_CMD_RD_BCK       0x3F
-
+#define ADS_RANGE_PM2V56   0x02
 /* Frame builders for program register access */
 static inline uint16_t ADS8688_MakeWrite(uint8_t reg, uint8_t val)
 { return (uint16_t)((0x1u<<12) | ((reg & 0x3Fu) << 8) | (val)); }
@@ -80,5 +66,4 @@ uint8_t  ADS8688_ProgRead(uint8_t reg);
 
 /* Simple smoke test: reset -> align -> MAN_0 -> read (returns 16-bit sample) */
 uint16_t ADS8688_SmokeTest(void);
-
 #endif /* ADS8688_MIN_H */

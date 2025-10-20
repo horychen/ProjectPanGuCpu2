@@ -31,7 +31,7 @@
 //#define SPI_BRR        (12) // Formula : 100/(BBR+1) = SPI Baud Rate
 //#define SPI_BRR        (6) // 14.28 MHz for high speed SPI
 #define SPI_BRR        (3) // 25 MHz for high speed SPI
-#define SPI_BRR_A        (39) // 25 MHz for high speed SPI
+#define SPI_BRR_A        (19) // 2.5 MHz for high speed SPI
 //#define SPI_BRR        ((200E6 / 4) / 5E6) - 1 // since LSPCK=100MHz, spi_clk is 10 MHz
 #endif
 

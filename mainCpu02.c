@@ -17,7 +17,9 @@ struct IPC_MEMORY_READ Read;
 #pragma DATA_SECTION( Read, "SHARERAMGS1");
 #pragma DATA_SECTION(Write, "SHARERAMGS0"); // GS0 is write
 
-
+float testval=0.0;
+int hzq_debug=0;
+uint8_t r0 = 0;
 void MemCopy(Uint16 *SourceAddr, Uint16* SourceEndAddr, Uint16* DestAddr);
 void MemCopy(Uint16 *SourceAddr, Uint16* SourceEndAddr, Uint16* DestAddr)
 {
@@ -391,6 +393,12 @@ void main(void){
     //    HWREG(CANA_BASE + CAN_O_TEST) = CAN_TEST_EXL;
     Setup_CAN_Encoder();
 
+    ADS8688_SendCmd(ADS_CMD_RST, 0x00);
+    DELAY_US(10000);
+    (void)ADS8688_Frame32(0x0000);
+    ADS8688_SetAll_PM2V56();
+
+    r0 = ADS8688_ProgRead(ADS_REG_CH0_RANGE);
     #if FALSE
         int i;
         for(i=0;i<2000;i++)
@@ -424,11 +432,16 @@ void main(void){
                         DAC_MAX5725(5, Read.dac_buffer[4] ); //71us 10khz
                         DAC_MAX5725(6, Read.dac_buffer[5] ); //71us 10khz
                         DAC_MAX5725(7, Read.dac_buffer[6] ); //71us 10khz
-                        DAC_MAX5725(8, Read.dac_buffer[7] ); //71us 10khz
+//                        DAC_MAX5725(8, Read.dac_buffer[7] ); //71us 10khz
             #endif
             #endif
                 // 简单轮询读取，放在你的while(1)循环里
-            Write.adc_raw = ADS8688_Frame32(0x0000);
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_0 << 8));
+            Write.adc_raw[0] = ADS8688_Frame32(0x0000);
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_1 << 8));
+            Write.adc_raw[1] = ADS8688_Frame32(0x0000);
+            testval = Write.adc_raw[hzq_debug] * 3.052316708e-5 -1;
+            DAC_MAX5725(8, testval);
             IPCRtoLFlagAcknowledge (IPC_FLAG7);
         }//tok1
         // delta1 = 2864 (when SPI_BRR = 6, spi_clk is 14.28MHz)
