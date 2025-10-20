@@ -396,17 +396,6 @@ void main(void){
     ADS8688_SendCmd(ADS_CMD_RST, 0x00);
     DELAY_US(10000);
     (void)ADS8688_Frame32(0x0000);
-    ADS8688_SetAll_PM2V56();
-
-    r0 = ADS8688_ProgRead(ADS_REG_CH0_RANGE);
-    #if FALSE
-        int i;
-        for(i=0;i<2000;i++)
-        {
-        dataStoreCan[i] = 0;
-        dataStoreSci[i] = 0;
-        }
-    #endif
 
     while(1)
     {
@@ -440,6 +429,8 @@ void main(void){
             Write.adc_raw[0] = ADS8688_Frame32(0x0000);
             (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_1 << 8));
             Write.adc_raw[1] = ADS8688_Frame32(0x0000);
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_2 << 8));
+            Write.adc_raw[2] = ADS8688_Frame32(0x0000);
             testval = Write.adc_raw[hzq_debug] * 3.052316708e-5 -1;
             DAC_MAX5725(8, testval);
             IPCRtoLFlagAcknowledge (IPC_FLAG7);
@@ -473,45 +464,6 @@ void main(void){
         // tok2
         // tok2-tik2 = delta2 = 25328
 
-    #if FALSE
-        // hip
-        can_used = can_pos_ID0x01;
-        sci_used = sciB_pos;
-        // shank
-        can_used = can_pos_ID0x03;
-        sci_used = sciA_pos;
-
-        deltaPos = (int32)(can_used - can_pos_prev);
-        if(deltaPos < -65536)
-        {
-            deltaPos += 131072;
-        }
-        if(deltaPos > 65536)
-        {
-            deltaPos -= 131072;
-        }
-        if( deltaPos < (-1)*dataWidth){
-            dataIndex++;
-            startRecode = 1;
-        }else if( deltaPos > dataWidth){
-            dataIndex--;
-            startRecode = 1;
-        }
-
-        if(dataIndex>=2000){
-            dataIndex = 1999;
-        }else if (dataIndex<0){
-            dataIndex = 0;
-        }
-
-        if(startRecode == 1)
-        {
-            can_pos_prev = can_used;
-            dataStoreCan[dataIndex] = (REAL)(can_used/131072.0*360.0);
-            dataStoreSci[dataIndex] = (REAL)(sci_used/8388608.0*360.0);
-            startRecode = 0;
-        }
-    #endif
     }
 }
 
