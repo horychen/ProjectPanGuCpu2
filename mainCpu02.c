@@ -431,6 +431,16 @@ void main(void){
             Write.adc_raw[1] = ADS8688_Frame32(0x0000);
             (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_2 << 8));
             Write.adc_raw[2] = ADS8688_Frame32(0x0000);
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_3 << 8));
+            Write.adc_raw[3] = ADS8688_Frame32(0x0000);
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_4 << 8));
+            Write.adc_raw[4] = ADS8688_Frame32(0x0000);
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_5 << 8));
+            Write.adc_raw[5] = ADS8688_Frame32(0x0000);
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_6 << 8));
+            Write.adc_raw[6] = ADS8688_Frame32(0x0000);
+            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_7 << 8));
+            Write.adc_raw[7] = ADS8688_Frame32(0x0000);
             testval = Write.adc_raw[hzq_debug] * 3.052316708e-5 -1;
             DAC_MAX5725(8, testval);
             IPCRtoLFlagAcknowledge (IPC_FLAG7);
