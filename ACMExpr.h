@@ -33,8 +33,9 @@ struct IPC_MEMORY_WRITE{
 
     REAL position_cmd_elec;
     REAL speed_cmd_elec;
+    
     int16_t adc_test_val;
-    int64_t adc_raw[8];
+    Uint16 adc_raw[8];
     int16 SCI_char;
     // ˫�����
 };
