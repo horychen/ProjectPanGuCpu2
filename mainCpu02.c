@@ -394,7 +394,7 @@ void main(void){
     Setup_CAN_Encoder();
 
     ADS8688_SendCmd(ADS_CMD_RST, 0x00);
-    DELAY_US(10000);
+    DELAY_US(100);
     (void)ADS8688_Frame32(0x0000);
     // ADS8688_ProgWrite(ADS_REG_CH0_RANGE, ADS_RANGE_PM2V56);
     while(1)
@@ -439,16 +439,16 @@ void main(void){
             Write.adc_raw[1] = ADS8688_Frame32(0x0000);
             (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_2 << 8));
             Write.adc_raw[2] = ADS8688_Frame32(0x0000);
-            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_3 << 8));
-            Write.adc_raw[3] = ADS8688_Frame32(0x0000);
-            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_4 << 8));
-            Write.adc_raw[4] = ADS8688_Frame32(0x0000);
-            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_5 << 8));
-            Write.adc_raw[5] = ADS8688_Frame32(0x0000);
-            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_6 << 8));
-            Write.adc_raw[6] = ADS8688_Frame32(0x0000);
-            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_7 << 8));
-            Write.adc_raw[7] = ADS8688_Frame32(0x0000);
+//            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_3 << 8));
+//            Write.adc_raw[3] = ADS8688_Frame32(0x0000);
+//            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_4 << 8));
+//            Write.adc_raw[4] = ADS8688_Frame32(0x0000);
+//            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_5 << 8));
+//            Write.adc_raw[5] = ADS8688_Frame32(0x0000);
+//            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_6 << 8));
+//            Write.adc_raw[6] = ADS8688_Frame32(0x0000);
+//            (void)ADS8688_Frame32(((uint16_t)ADS_CMD_MAN_7 << 8));
+//            Write.adc_raw[7] = ADS8688_Frame32(0x0000);
             // Set a flag to notify CPU02 that data is available
             IPCLtoRFlagSet(IPC_FLAG11);
         }
