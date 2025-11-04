@@ -25,8 +25,14 @@
 //
 #if CPU_FRQ_200MHZ
 //#define SPI_BRR        ((200E6 / 4) / 500E3) - 1
-#define SPI_BRR        ((200E6 / 4) / 5E6) - 1 // 5 MHz for high speed SPI
-//#define SPI_BRR        ((200E6 / 4) / 5E6) - 1 // 5 MHz
+
+// LSPCLK = 100MHz, when SPI_BRR+1=7, baud rate = 100/7~=14.28MHz < 15MHz
+
+//#define SPI_BRR        (12) // Formula : 100/(BBR+1) = SPI Baud Rate
+//#define SPI_BRR        (6) // 14.28 MHz for high speed SPI
+#define SPI_BRR        (3) // 25 MHz for high speed SPI
+#define SPI_BRR_A        (19) // 2.5 MHz for high speed SPI
+//#define SPI_BRR        ((200E6 / 4) / 5E6) - 1 // since LSPCK=100MHz, spi_clk is 10 MHz
 #endif
 
 #if CPU_FRQ_150MHZ
@@ -40,12 +46,12 @@
 //
 // InitSPI - This function initializes the SPI to a known state
 //
-void InitSpi(void)
+void InitSpi4MAX5725(void)
 {
-    // GPIOÅäÖÃ
+    // GPIOï¿½ï¿½ï¿½ï¿½
     //InitSpiaGpio();
 
-    // ÉÏµç¸´Î»ºó£¬SPI¹¤×÷ÔÚ±ê×¼Ä£Ê½ÏÂ£¬½ûÖ¹SPI FIFO¹¦ÄÜ
+    // ï¿½Ïµç¸´Î»ï¿½ï¿½SPIï¿½ï¿½ï¿½ï¿½ï¿½Ú±ï¿½×¼Ä£Ê½ï¿½Â£ï¿½ï¿½ï¿½Ö¹SPI FIFOï¿½ï¿½ï¿½ï¿½
     // Initialize SPI FIFO registers
     //SpiaRegs.SPIFFTX.all=0xE040;
     //SpiaRegs.SPIFFRX.all=0x204f;
@@ -55,52 +61,63 @@ void InitSpi(void)
 
 #if 1
 
-    // SPI ¼Ä´æÆ÷ÅäÖÃ
+    // SPI ï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-    //SpiaRegs.SPICCR.all =0x000F;    // Reset on, output at rising edge, 16-bit char bits
     // Set reset low before configuration changes
-    // Clock polarity (0 == rising, 1 == falling)
-    // 16-bit character
-    // Disable loop-back
     SpicRegs.SPICCR.bit.SPISWRESET = 0;
-    SpicRegs.SPICCR.bit.CLKPOLARITY = 0;
-    SpicRegs.SPICCR.bit.SPICHAR = (16-1);
-    //SpiaRegs.SPICCR.bit.SPILBK = 1; // This makes MAX5307 send DAC signal to the oscilloscope??? No, it does not! 231010 cjh, make sure GPIO57 is changed GPIO61
-    SpicRegs.SPICCR.bit.SPILBK = 0; //
+    {
+        //SpiaRegs.SPICCR.all =0x000F;    // Reset on, output at rising edge, 16-bit char bits
+        // Clock polarity (0 == rising, 1 == falling)
+        // 16-bit character
+        // Disable loop-back
+        SpicRegs.SPICCR.bit.SPICHAR = (12-1); // BITS - 1
+        SpicRegs.SPICCR.bit.CLKPOLARITY = 0;
+        SpicRegs.SPICCR.bit.SPILBK = 0; // LOOP BACK
+        SpicRegs.SPICCR.bit.HS_MODE = 0x1; // HIGH SPEED MODE
 
-    //SpiaRegs.SPICTL.all =0x0006;    // CLOCK PHASE=0, Master Mode, enable talk, and SPI int disabled.
-    // Enable master (0 == slave, 1 == master)
-    // Enable transmission (Talk)
-    // Clock phase (0 == normal, 1 == delayed)
-    // SPI interrupts are disabled
-    SpicRegs.SPICTL.bit.MASTER_SLAVE = 1;
-    SpicRegs.SPICTL.bit.TALK = 1;
-    SpicRegs.SPICTL.bit.CLK_PHASE = 0;
-    SpicRegs.SPICTL.bit.SPIINTENA = 0;
+        //SpiaRegs.SPICTL.all =0x0006;    // CLOCK PHASE=0, Master Mode, enable talk, and SPI int disabled.
+        // Enable master (0 == slave, 1 == master)
+        // Enable transmission (Talk)
+        // Clock phase (0 == normal, 1 == delayed)
+        // SPI interrupts are disabled
+        SpicRegs.SPICTL.bit.MASTER_SLAVE = 1;
+        SpicRegs.SPICTL.bit.TALK = 1;
+        SpicRegs.SPICTL.bit.CLK_PHASE = 0;
+        SpicRegs.SPICTL.bit.SPIINTENA = 0;
 
-    // Set the baud rate
-    SpicRegs.SPIBRR.bit.SPI_BIT_RATE = SPI_BRR;
-    //SpiaRegs.SPIBRR = 0x1;           // SPI Baud Rate = LSPCLK/(SPIBRR+1), ¸ù¾ÝÊéÉÏ¹«Ê½£¬LSPCLK=37.5MHz so=37.5/4=9.375MHz
+        // Set the baud rate
+        SpicRegs.SPIBRR.bit.SPI_BIT_RATE = (Uint16)SPI_BRR;
+        //SpiaRegs.SPIBRR = 0x1;           // SPI Baud Rate = LSPCLK/(SPIBRR+1), ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¹ï¿½Ê½ï¿½ï¿½LSPCLK=37.5MHz so=37.5/4=9.375MHz
 
-    SpicRegs.SPICCR.all = 0x008F;    // ÔÚ¸Ä±äÉèÖÃÇ°½«RESETÇåÁã£¬²¢ÔÚÉèÖÃ½áÊøºó½«ÆäÖÃÎ»
+        // SpicRegs.SPICCR.all = 0x008F   ;    // ï¿½Ú¸Ä±ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½RESETï¿½ï¿½ï¿½ã£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»
+            //    18.4.3 Configuring the SPI for High-Speed Mode
+            // SpiaRegs.SPICCR.bit.HS_MODE = 0x1;
 
-    // Set FREE bit
-    // Halting on a breakpoint will not halt the SPI
-    SpicRegs.SPIPRI.bit.FREE = 1;   // breakpoints don't disturb xmission
+        // Set FREE bit
+        // Halting on a breakpoint will not halt the SPI
+        SpicRegs.SPIPRI.bit.FREE = 1;   // breakpoints don't disturb xmission
+    }
+    // Step 4. Set SPISWRESET to 1 to release the SPI from the reset state.
+    SpicRegs.SPICCR.bit.SPISWRESET = 1;
 
 
-    // »½ÐÑMAX5307
+    // ï¿½ï¿½ï¿½ï¿½MAX5307
     GpioDataRegs.GPCSET.bit.GPIO72 = 1;             //cs=1
     NOP;
     NOP;
     GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;           //cs=0
 
-    SpicRegs.SPITXBUF=0xfffc;                       //MAX5307»½ÐÑ×Ö·û
-    while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // Êý¾Ý´«ÍêºóINT_FLAG»áÖÃÎ»
 
-    GpioDataRegs.GPCSET.bit.GPIO72 = 1;             //cs=1ÎªÏÂÒ»´Î×ö×¼±¸
+    SpicRegs.SPITXBUF=0x4000;
+    while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // ï¿½ï¿½ï¿½Ý´ï¿½ï¿½ï¿½ï¿½INT_FLAGï¿½ï¿½ï¿½ï¿½Î»
+    SpicRegs.SPITXBUF=0xFF00;
+    while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // ï¿½ï¿½ï¿½Ý´ï¿½ï¿½ï¿½ï¿½INT_FLAGï¿½ï¿½ï¿½ï¿½Î»
+    SpicRegs.SPITXBUF=0x0000;   //MAX5725ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½
+    while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // ï¿½ï¿½ï¿½Ý´ï¿½ï¿½ï¿½ï¿½INT_FLAGï¿½ï¿½ï¿½ï¿½Î»
 
-    SpicRegs.SPICCR.bit.SPISWRESET=0;               //Í¨¹ýreset Çå³þSPIÖÐ¶Ï±êÖ¾INT_FLAG
+    GpioDataRegs.GPCSET.bit.GPIO72 = 1;             //cs=1Îªï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½×¼ï¿½ï¿½
+
+    SpicRegs.SPICCR.bit.SPISWRESET=0;               //Í¨ï¿½ï¿½reset ï¿½ï¿½ï¿½SPIï¿½Ð¶Ï±ï¿½Ö¾INT_FLAG
     NOP;
     NOP;
     // Release the SPI from reset
@@ -109,7 +126,7 @@ void InitSpi(void)
 
 #else
 
-    // SPI ¼Ä´æÆ÷ÅäÖÃ
+    // SPI ï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
     //SpiaRegs.SPICCR.all =0x000F;    // Reset on, output at rising edge, 16-bit char bits
     // Set reset low before configuration changes
@@ -134,27 +151,27 @@ void InitSpi(void)
 
     // Set the baud rate
     SpiaRegs.SPIBRR.bit.SPI_BIT_RATE = SPI_BRR;
-    //SpiaRegs.SPIBRR = 0x1;           // SPI Baud Rate = LSPCLK/(SPIBRR+1), ¸ù¾ÝÊéÉÏ¹«Ê½£¬LSPCLK=37.5MHz so=37.5/4=9.375MHz
+    //SpiaRegs.SPIBRR = 0x1;           // SPI Baud Rate = LSPCLK/(SPIBRR+1), ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¹ï¿½Ê½ï¿½ï¿½LSPCLK=37.5MHz so=37.5/4=9.375MHz
 
-    SpiaRegs.SPICCR.all = 0x008F;    // ÔÚ¸Ä±äÉèÖÃÇ°½«RESETÇåÁã£¬²¢ÔÚÉèÖÃ½áÊøºó½«ÆäÖÃÎ»
+    SpiaRegs.SPICCR.all = 0x008F;    // ï¿½Ú¸Ä±ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½RESETï¿½ï¿½ï¿½ã£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»
 
     // Set FREE bit
     // Halting on a breakpoint will not halt the SPI
     SpiaRegs.SPIPRI.bit.FREE = 1;   // breakpoints don't disturb xmission
 
 
-    // »½ÐÑMAX5307
+    // ï¿½ï¿½ï¿½ï¿½MAX5307
     GpioDataRegs.GPBSET.bit.GPIO61 = 1;             //cs=1
     NOP;
     NOP;
     GpioDataRegs.GPBCLEAR.bit.GPIO61 = 1;           //cs=0
 
-    SpiaRegs.SPITXBUF=0xfffc;                       //MAX5307»½ÐÑ×Ö·û
-    while(SpiaRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // Êý¾Ý´«ÍêºóINT_FLAG»áÖÃÎ»
+    SpiaRegs.SPITXBUF=0xfffc;                       //MAX5307ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½
+    while(SpiaRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // ï¿½ï¿½ï¿½Ý´ï¿½ï¿½ï¿½ï¿½INT_FLAGï¿½ï¿½ï¿½ï¿½Î»
 
-    GpioDataRegs.GPBSET.bit.GPIO61 = 1;             //cs=1ÎªÏÂÒ»´Î×ö×¼±¸
+    GpioDataRegs.GPBSET.bit.GPIO61 = 1;             //cs=1Îªï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½×¼ï¿½ï¿½
 
-    SpiaRegs.SPICCR.bit.SPISWRESET=0;               //Í¨¹ýreset Çå³þSPIÖÐ¶Ï±êÖ¾INT_FLAG
+    SpiaRegs.SPICCR.bit.SPISWRESET=0;               //Í¨ï¿½ï¿½reset ï¿½ï¿½ï¿½SPIï¿½Ð¶Ï±ï¿½Ö¾INT_FLAG
     NOP;
     NOP;
     // Release the SPI from reset
@@ -165,6 +182,159 @@ void InitSpi(void)
 
 }
 
+
+void InitSpi4ADS8688(void){
+    EALLOW;
+    SpiaRegs.SPICCR.bit.SPISWRESET = 0;
+    SpiaRegs.SPICCR.bit.SPICHAR = (8u - 1u); // BITS - 1
+    SpiaRegs.SPICCR.bit.CLKPOLARITY = 0;
+    SpiaRegs.SPICCR.bit.SPILBK = 0; // LOOP BACK
+    SpiaRegs.SPICCR.bit.HS_MODE = 1; // HIGH SPEED MODE
+    //SpiaRegs.SPICTL.all =0x0006;    // CLOCK PHASE=0, Master Mode, enable talk, and SPI int disabled.
+    // Enable master (0 == slave, 1 == master)
+    // Enable transmission (Talk)
+    // Clock phase (0 == normal, 1 == delayed)
+    // SPI interrupts are disabled
+    SpiaRegs.SPICTL.bit.MASTER_SLAVE = 1;
+    SpiaRegs.SPICTL.bit.TALK = 1;
+    SpiaRegs.SPICTL.bit.CLK_PHASE = 1;
+    SpiaRegs.SPICTL.bit.SPIINTENA = 0;
+
+    // Set the baud rate                        // ç¡¬ä»¶æœ€å°å€¼ä¿æŠ¤
+    SpiaRegs.SPIBRR.bit.SPI_BIT_RATE = SPI_BRR_A;
+
+    SpiaRegs.SPIPRI.bit.FREE = 1;
+
+    // Release the SPI from reset
+    SpiaRegs.SPICCR.bit.SPISWRESET=1;               // Relinquish SPI from Reset
+    EDIS;
+}
+
+
+void InitSpi4MAX5307(void)
+{
+    // GPIOï¿½ï¿½ï¿½ï¿½
+    //InitSpiaGpio();
+
+    // ï¿½Ïµç¸´Î»ï¿½ï¿½SPIï¿½ï¿½ï¿½ï¿½ï¿½Ú±ï¿½×¼Ä£Ê½ï¿½Â£ï¿½ï¿½ï¿½Ö¹SPI FIFOï¿½ï¿½ï¿½ï¿½
+    // Initialize SPI FIFO registers
+    //SpiaRegs.SPIFFTX.all=0xE040;
+    //SpiaRegs.SPIFFRX.all=0x204f;
+    //SpiaRegs.SPIFFTX.all=0xe021;      // Enable FIFO's, set TX FIFO level to 1
+    //SpiaRegs.SPIFFRX.all=0x0;//0x0021;      // Set RX FIFO level to 8
+    //SpiaRegs.SPIFFCT.all=0x0;
+
+#if 1
+
+    // SPI ï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+
+    //SpiaRegs.SPICCR.all =0x000F;    // Reset on, output at rising edge, 16-bit char bits
+    // Set reset low before configuration changes
+    // Clock polarity (0 == rising, 1 == falling)
+    // 16-bit character
+    // Disable loop-back
+    SpicRegs.SPICCR.bit.SPISWRESET = 0;
+    SpicRegs.SPICCR.bit.CLKPOLARITY = 0;
+    SpicRegs.SPICCR.bit.SPICHAR = (16-1);
+    //SpiaRegs.SPICCR.bit.SPILBK = 1; // This makes MAX5307 send DAC signal to the oscilloscope??? No, it does not! 231010 cjh, make sure GPIO57 is changed GPIO61
+    SpicRegs.SPICCR.bit.SPILBK = 0; //
+
+    //SpiaRegs.SPICTL.all =0x0006;    // CLOCK PHASE=0, Master Mode, enable talk, and SPI int disabled.
+    // Enable master (0 == slave, 1 == master)
+    // Enable transmission (Talk)
+    // Clock phase (0 == normal, 1 == delayed)
+    // SPI interrupts are disabled
+    SpicRegs.SPICTL.bit.MASTER_SLAVE = 1;
+    SpicRegs.SPICTL.bit.TALK = 1;
+    SpicRegs.SPICTL.bit.CLK_PHASE = 0;
+    SpicRegs.SPICTL.bit.SPIINTENA = 0;
+
+    // Set the baud rate
+    SpicRegs.SPIBRR.bit.SPI_BIT_RATE = (Uint16)SPI_BRR;
+    //SpiaRegs.SPIBRR = 0x1;           // SPI Baud Rate = LSPCLK/(SPIBRR+1), ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¹ï¿½Ê½ï¿½ï¿½LSPCLK=37.5MHz so=37.5/4=9.375MHz
+
+    SpicRegs.SPICCR.all = 0x008F;    // ï¿½Ú¸Ä±ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½RESETï¿½ï¿½ï¿½ã£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»
+
+    // Set FREE bit
+    // Halting on a breakpoint will not halt the SPI
+    SpicRegs.SPIPRI.bit.FREE = 1;   // breakpoints don't disturb xmission
+
+
+    // ï¿½ï¿½ï¿½ï¿½MAX5307
+    GpioDataRegs.GPCSET.bit.GPIO72 = 1;             //cs=1
+    NOP;
+    NOP;
+    GpioDataRegs.GPCCLEAR.bit.GPIO72 = 1;           //cs=0
+
+    SpicRegs.SPITXBUF=0xfffc;                       //MAX5307ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½
+    while(SpicRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // ï¿½ï¿½ï¿½Ý´ï¿½ï¿½ï¿½ï¿½INT_FLAGï¿½ï¿½ï¿½ï¿½Î»
+
+    GpioDataRegs.GPCSET.bit.GPIO72 = 1;             //cs=1Îªï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½×¼ï¿½ï¿½
+
+    SpicRegs.SPICCR.bit.SPISWRESET=0;               //Í¨ï¿½ï¿½reset ï¿½ï¿½ï¿½SPIï¿½Ð¶Ï±ï¿½Ö¾INT_FLAG
+    NOP;
+    NOP;
+    // Release the SPI from reset
+    SpicRegs.SPICCR.bit.SPISWRESET=1;               // Relinquish SPI from Reset
+
+
+#else
+
+    // SPI ï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+
+    //SpiaRegs.SPICCR.all =0x000F;    // Reset on, output at rising edge, 16-bit char bits
+    // Set reset low before configuration changes
+    // Clock polarity (0 == rising, 1 == falling)
+    // 16-bit character
+    // Disable loop-back
+    SpiaRegs.SPICCR.bit.SPISWRESET = 0;
+    SpiaRegs.SPICCR.bit.CLKPOLARITY = 0;
+    SpiaRegs.SPICCR.bit.SPICHAR = (16-1);
+    //SpiaRegs.SPICCR.bit.SPILBK = 1; // This makes MAX5307 send DAC signal to the oscilloscope??? No, it does not! 231010 cjh, make sure GPIO57 is changed GPIO61
+    SpiaRegs.SPICCR.bit.SPILBK = 0; //
+
+    //SpiaRegs.SPICTL.all =0x0006;    // CLOCK PHASE=0, Master Mode, enable talk, and SPI int disabled.
+    // Enable master (0 == slave, 1 == master)
+    // Enable transmission (Talk)
+    // Clock phase (0 == normal, 1 == delayed)
+    // SPI interrupts are disabled
+    SpiaRegs.SPICTL.bit.MASTER_SLAVE = 1;
+    SpiaRegs.SPICTL.bit.TALK = 1;
+    SpiaRegs.SPICTL.bit.CLK_PHASE = 0;
+    SpiaRegs.SPICTL.bit.SPIINTENA = 0;
+
+    // Set the baud rate
+    SpiaRegs.SPIBRR.bit.SPI_BIT_RATE = SPI_BRR;
+    //SpiaRegs.SPIBRR = 0x1;           // SPI Baud Rate = LSPCLK/(SPIBRR+1), ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¹ï¿½Ê½ï¿½ï¿½LSPCLK=37.5MHz so=37.5/4=9.375MHz
+
+    SpiaRegs.SPICCR.all = 0x008F;    // ï¿½Ú¸Ä±ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½RESETï¿½ï¿½ï¿½ã£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»
+
+    // Set FREE bit
+    // Halting on a breakpoint will not halt the SPI
+    SpiaRegs.SPIPRI.bit.FREE = 1;   // breakpoints don't disturb xmission
+
+
+    // ï¿½ï¿½ï¿½ï¿½MAX5307
+    GpioDataRegs.GPBSET.bit.GPIO61 = 1;             //cs=1
+    NOP;
+    NOP;
+    GpioDataRegs.GPBCLEAR.bit.GPIO61 = 1;           //cs=0
+
+    SpiaRegs.SPITXBUF=0xfffc;                       //MAX5307ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½
+    while(SpiaRegs.SPISTS.bit.INT_FLAG!=1){NOP;}    // ï¿½ï¿½ï¿½Ý´ï¿½ï¿½ï¿½ï¿½INT_FLAGï¿½ï¿½ï¿½ï¿½Î»
+
+    GpioDataRegs.GPBSET.bit.GPIO61 = 1;             //cs=1Îªï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½×¼ï¿½ï¿½
+
+    SpiaRegs.SPICCR.bit.SPISWRESET=0;               //Í¨ï¿½ï¿½reset ï¿½ï¿½ï¿½SPIï¿½Ð¶Ï±ï¿½Ö¾INT_FLAG
+    NOP;
+    NOP;
+    // Release the SPI from reset
+    SpiaRegs.SPICCR.bit.SPISWRESET=1;               // Relinquish SPI from Reset
+
+
+#endif
+
+}
 //
 // End of file
 //
